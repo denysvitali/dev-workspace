@@ -110,7 +110,7 @@ ENV EDITOR=vim
 ENV PAGER=less
 
 # Initialize Rust environment for workspace user
-RUN . ~/.cargo/env
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
 # Setup shell configuration with useful aliases
 RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \
