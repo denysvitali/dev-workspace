@@ -16,7 +16,7 @@ if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
 fi
 
 # Start sshd daemon in the background
-sudo sshd -D &
+sudo /usr/sbin/sshd -D &
 
 # Setup Tailscale if auth key is provided
 if [ -n "$TAILSCALE_AUTH_KEY" ]; then
