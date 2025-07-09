@@ -78,8 +78,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
     . ~/.cargo/env
 
-# Create workspace user
-RUN adduser -D -s /bin/bash -G wheel workspace && \
+# Create workspace user and group
+RUN addgroup workspace && \
+    adduser -D -s /bin/bash -G wheel -G workspace workspace && \
     echo 'workspace ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
     chown workspace:workspace /workspace
 
