@@ -80,7 +80,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 
 # Create workspace user
 RUN adduser -D -s /bin/bash -G wheel workspace && \
-    echo 'workspace ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+    echo 'workspace ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+    chown workspace:workspace /workspace
 
 # Install Claude Code globally
 RUN npm install -g @anthropic-ai/claude-code
@@ -91,7 +92,7 @@ RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/s
     sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
 # Create workspace directory
-RUN mkdir -p /workspace && chown workspace:workspace /workspace
+RUN mkdir -p /workspace
 
 # Create startup script
 COPY entrypoint.sh /entrypoint.sh
