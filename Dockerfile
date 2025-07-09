@@ -39,11 +39,9 @@ RUN apk add --no-cache \
     exa \
     tree \
     less \
-    find \
     findutils \
     grep \
     sed \
-    awk \
     tar \
     gzip \
     xz \
