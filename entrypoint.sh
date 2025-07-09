@@ -15,8 +15,8 @@ if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     sudo ssh-keygen -A
 fi
 
-# Start SSH daemon
-sudo service ssh start
+# Start sshd daemon in the background
+sudo sshd -D &
 
 # Setup Tailscale if auth key is provided
 if [ -n "$TAILSCALE_AUTH_KEY" ]; then
