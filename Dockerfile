@@ -78,6 +78,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
     . ~/.cargo/env
 
+# Create workspace directory
+RUN mkdir -p /workspace
+
 # Create workspace user and group
 RUN addgroup workspace && \
     adduser -D -s /bin/bash -G wheel -G workspace workspace && \
@@ -91,9 +94,6 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
     sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-
-# Create workspace directory
-RUN mkdir -p /workspace
 
 # Create startup script
 COPY entrypoint.sh /entrypoint.sh
