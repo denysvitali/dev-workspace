@@ -64,11 +64,4 @@ fi
 
 # Keep container running
 log "Keeping container alive..."
-while true; do
-    sleep 60
-    # Health check - ensure services are running
-    if ! pgrep -x "sshd" > /dev/null; then
-        log "SSH daemon not running, restarting..."
-        sudo service ssh restart
-    fi
-done
+tail -f /dev/null
