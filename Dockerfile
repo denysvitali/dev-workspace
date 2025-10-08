@@ -92,9 +92,8 @@ RUN addgroup workspace && \
     adduser -D -s /bin/bash -G workspace workspace && \
     chown workspace:workspace /workspace
 
-# Create tailscale group and configure for root access when needed
-RUN addgroup tailscale && \
-    echo '%tailscale ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# Configure tailscale group for root access when needed (group created by tailscale package)
+RUN echo '%tailscale ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 # Setup SSH
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
