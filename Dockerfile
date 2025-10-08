@@ -68,27 +68,33 @@ RUN apk add --no-cache \
     tailscale \
     kubectl \
     tzdata \
+    pnpm \
+    github-cli \
+    libgudev-dev \
     && rm -rf /var/cache/apk/*
 
 # Set timezone and locale
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Install Rust
+# Install global npm packages
+RUN npm install -g @anthropic-ai/claude-code
+
+# Install Rust (using official rustup script for latest version)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
     . ~/.cargo/env
 
 # Create workspace directory
 RUN mkdir -p /workspace
 
-# Create workspace user and group
+# Create workspace user and group (non-privileged)
 RUN addgroup workspace && \
-    adduser -D -s /bin/bash -G wheel -G workspace workspace && \
-    echo 'workspace ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+    adduser -D -s /bin/bash -G workspace workspace && \
     chown workspace:workspace /workspace
 
-# Install Claude Code globally
-RUN npm install -g @anthropic-ai/claude-code
+# Create tailscale group and configure for root access when needed
+RUN addgroup tailscale && \
+    echo '%tailscale ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 # Setup SSH
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
@@ -99,8 +105,7 @@ RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/s
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Switch to workspace user
-USER workspace
+# Set working directory
 WORKDIR /workspace
 
 # Setup environment variables
@@ -145,8 +150,20 @@ RUN mkdir -p ~/go/src ~/go/bin ~/go/pkg ~/.local/bin ~/.ssh ~/.config
 EXPOSE 22
 EXPOSE 60000-61000/udp
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD pgrep -f "sshd|tailscaled" > /dev/null || exit 1
+# Add comprehensive health check
+HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
+    CMD bash -c ' \
+        # Check if SSH daemon is running \
+        pgrep sshd > /dev/null || exit 1; \
+        # Check if Tailscale daemon is running (if configured) \
+        if [ -n "$TAILSCALE_AUTH_KEY" ]; then \
+            pgrep tailscaled > /dev/null || exit 1; \
+            # Check if Tailscale is connected \
+            tailscale status > /dev/null 2>&1 || exit 1; \
+        fi; \
+        # Check if workspace user shell is accessible \
+        su - workspace -c "whoami" > /dev/null || exit 1; \
+        echo "All services healthy" \
+    '
 
 ENTRYPOINT ["/entrypoint.sh"]
