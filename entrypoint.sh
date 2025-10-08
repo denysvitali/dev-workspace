@@ -68,6 +68,11 @@ if [ -n "$TAILSCALE_AUTH_KEY" ]; then
     # Create necessary directories
     mkdir -p /var/lib/tailscale /var/run/tailscale
 
+    # Create backup resolv.conf to prevent Tailscale DNS warnings
+    if [ ! -f /etc/resolv.pre-tailscale-backup.conf ] && [ -f /etc/resolv.conf ]; then
+        cp /etc/resolv.conf /etc/resolv.pre-tailscale-backup.conf
+    fi
+
     # Start tailscaled with retry logic
     retry 3 tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
     sleep 3
@@ -162,5 +167,5 @@ export PAGER=less
 cd /workspace
 echo 'Workspace container is ready. You are now workspace user.'
 echo 'Use \"exit\" to stop the container.'
-exec bash
+exec /bin/bash
 "
