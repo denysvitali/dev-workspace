@@ -65,7 +65,6 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     yarn \
-    tailscale \
     kubectl \
     tzdata \
     pnpm \
@@ -91,9 +90,6 @@ RUN mkdir -p /workspace
 RUN addgroup workspace && \
     adduser -D -s /bin/bash -G workspace workspace && \
     chown workspace:workspace /workspace
-
-# Configure tailscale group for root access when needed (group created by tailscale package)
-RUN echo '%tailscale ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 # Setup SSH
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
@@ -154,12 +150,6 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
     CMD bash -c ' \
         # Check if SSH daemon is running \
         pgrep sshd > /dev/null || exit 1; \
-        # Check if Tailscale daemon is running (if configured) \
-        if [ -n "$TAILSCALE_AUTH_KEY" ]; then \
-            pgrep tailscaled > /dev/null || exit 1; \
-            # Check if Tailscale is connected \
-            tailscale status > /dev/null 2>&1 || exit 1; \
-        fi; \
         # Check if workspace user shell is accessible \
         su - workspace -c "whoami" > /dev/null || exit 1; \
         echo "All services healthy" \
