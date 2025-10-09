@@ -157,15 +157,5 @@ if [ -n "$TAILSCALE_AUTH_KEY" ]; then
     fi
 fi
 
-# Switch to workspace user and keep container running
-log "Switching to workspace user..."
-exec su - workspace -c "
-export PATH='/home/workspace/.cargo/bin:/home/workspace/.local/bin:\$PATH'
-export GOPATH='/home/workspace/go'
-export EDITOR=vim
-export PAGER=less
-cd /workspace
-echo 'Workspace container is ready. You are now workspace user.'
-echo 'Use \"exit\" to stop the container.'
-exec /bin/bash
-"
+echo "Accepting connections via SSH..."
+tail -f /dev/null
