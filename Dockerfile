@@ -116,6 +116,30 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
     rustup component add rustfmt clippy
 USER root
 
+# Install Nix package manager (multi-user installation)
+RUN mkdir -p /nix && chown root:root /nix && \
+    # Create nixbld group and users for multi-user Nix
+    addgroup -g 30000 nixbld && \
+    for i in $(seq 1 10); do \
+        adduser -S -D -H -h /var/empty -g "Nix build user $i" -s /sbin/nologin -G nixbld -u $((30000 + i)) nixbld$i; \
+    done && \
+    # Add workspace user to nix-users group for access
+    addgroup nix-users && \
+    adduser workspace nix-users
+
+# Install Nix using the official installer
+RUN curl -L https://nixos.org/nix/install | sh -s -- --daemon --yes && \
+    # Source nix profile and configure for multi-user
+    . /etc/profile.d/nix.sh && \
+    # Create nix.conf with flakes and nix-command enabled
+    mkdir -p /etc/nix && \
+    echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf && \
+    echo "trusted-users = root workspace" >> /etc/nix/nix.conf && \
+    echo "allowed-users = *" >> /etc/nix/nix.conf
+
+# Add Nix to PATH for all users
+ENV PATH="/nix/var/nix/profiles/default/bin:$PATH"
+
 # Setup shell configuration with useful aliases
 RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \
     echo 'alias la="exa -la"' >> ~/.bashrc && \

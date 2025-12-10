@@ -51,6 +51,12 @@ fi
 # Start sshd daemon in the background
 /usr/sbin/sshd -D &
 
+# Start Nix daemon if available
+if [ -x /nix/var/nix/profiles/default/bin/nix-daemon ]; then
+    log "Starting Nix daemon..."
+    /nix/var/nix/profiles/default/bin/nix-daemon &
+fi
+
 # Setup SSH keys if provided
 if [ -n "$SSH_PUBLIC_KEY" ]; then
     log "Setting up SSH public key..."
