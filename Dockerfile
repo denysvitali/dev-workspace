@@ -1,7 +1,7 @@
 FROM alpine:latest
 
-# Install system dependencies, core utilities, and development tools
-RUN apk add --no-cache \
+# Update and install system dependencies, core utilities, and development tools
+RUN apk update && apk upgrade && apk add --no-cache \
     curl \
     wget \
     git \
@@ -70,18 +70,16 @@ RUN apk add --no-cache \
     pnpm \
     github-cli \
     libgudev-dev \
+    gcompat \
+    libc6-compat \
     && rm -rf /var/cache/apk/*
 
 # Set timezone and locale
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Install global npm packages
-RUN npm install -g @anthropic-ai/claude-code
-
-# Install Rust (using official rustup script for latest version)
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
-    . ~/.cargo/env
+# Install global npm packages (happy-coder and claude-code)
+RUN npm install -g happy-coder @anthropic-ai/claude-code
 
 # Create workspace directory
 RUN mkdir -p /workspace
@@ -108,9 +106,15 @@ ENV PATH="/home/workspace/.cargo/bin:/home/workspace/.local/bin:$PATH"
 ENV GOPATH="/home/workspace/go"
 ENV EDITOR=vim
 ENV PAGER=less
+ENV RUSTUP_HOME="/home/workspace/.rustup"
+ENV CARGO_HOME="/home/workspace/.cargo"
 
-# Initialize Rust environment for workspace user
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+# Install Rust via rustup for workspace user
+USER workspace
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
+    . /home/workspace/.cargo/env && \
+    rustup component add rustfmt clippy
+USER root
 
 # Setup shell configuration with useful aliases
 RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \

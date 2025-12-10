@@ -1,0 +1,265 @@
+name: Weekly Release
+
+on:
+  schedule:
+    # Run every Wednesday at 00:00 UTC
+    - cron: '0 0 * * 3'
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Force a release even if no changes'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      release_tag: ${{ steps.tag.outputs.release_tag }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for changes since last release
+      id: check
+      run: |
+        # Get the latest release tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+        if [ -z "$LATEST_TAG" ]; then
+          echo "No previous release found, will create first release"
+          echo "should_release=true" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event.inputs.force_release }}" == "true" ]; then
+          echo "Force release requested"
+          echo "should_release=true" >> $GITHUB_OUTPUT
+        else
+          # Check if there are commits since the last tag
+          COMMITS_SINCE=$(git rev-list ${LATEST_TAG}..HEAD --count)
+          if [ "$COMMITS_SINCE" -gt 0 ]; then
+            echo "Found $COMMITS_SINCE commits since $LATEST_TAG"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changes since $LATEST_TAG, skipping release"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+    - name: Generate release tag
+      id: tag
+      if: steps.check.outputs.should_release == 'true'
+      run: |
+        # Generate tag in format v2025.12.10
+        RELEASE_TAG="v$(date -u +%Y.%m.%d)"
+        echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+        echo "Generated release tag: $RELEASE_TAG"
+
+  create-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    outputs:
+      release_tag: ${{ needs.check-changes.outputs.release_tag }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Create and push tag
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        TAG="${{ needs.check-changes.outputs.release_tag }}"
+
+        # Check if tag already exists, if so append a suffix
+        SUFFIX=""
+        COUNTER=1
+        while git rev-parse "$TAG$SUFFIX" >/dev/null 2>&1; do
+          SUFFIX="-$COUNTER"
+          COUNTER=$((COUNTER + 1))
+        done
+
+        FINAL_TAG="$TAG$SUFFIX"
+        echo "Creating tag: $FINAL_TAG"
+
+        git tag -a "$FINAL_TAG" -m "Weekly release $FINAL_TAG"
+        git push origin "$FINAL_TAG"
+
+        echo "RELEASE_TAG=$FINAL_TAG" >> $GITHUB_ENV
+
+    - name: Trigger build workflow
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'build-docker.yml',
+            ref: process.env.RELEASE_TAG
+          });
+
+  wait-for-build:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Wait for build to complete
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const tag = '${{ needs.create-release.outputs.release_tag }}';
+          console.log(`Waiting for build workflow to complete for tag: ${tag}`);
+
+          // Wait up to 30 minutes for the build to complete
+          const maxAttempts = 60;
+          const delaySeconds = 30;
+
+          for (let i = 0; i < maxAttempts; i++) {
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-docker.yml',
+              head_sha: context.sha
+            });
+
+            const run = runs.data.workflow_runs[0];
+            if (run && run.status === 'completed') {
+              if (run.conclusion === 'success') {
+                console.log('Build completed successfully');
+                return;
+              } else {
+                core.setFailed(`Build failed with conclusion: ${run.conclusion}`);
+                return;
+              }
+            }
+
+            console.log(`Build still in progress, waiting ${delaySeconds}s...`);
+            await new Promise(r => setTimeout(r, delaySeconds * 1000));
+          }
+
+          core.setFailed('Timed out waiting for build to complete');
+
+  generate-release-notes:
+    needs: [create-release, wait-for-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download BOM artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: bom-*
+        merge-multiple: true
+        path: bom
+      continue-on-error: true
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Generate BOM from image
+      id: generate-bom
+      run: |
+        TAG="${{ needs.create-release.outputs.release_tag }}"
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG#v}"
+
+        mkdir -p release-bom
+
+        # Try to pull the image and generate BOM
+        if docker pull "$IMAGE" 2>/dev/null; then
+          docker run --rm "$IMAGE" sh -c '
+            echo "# Bill of Materials (BOM)"
+            echo "Release: ${{ needs.create-release.outputs.release_tag }}"
+            echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo ""
+            echo "## Base Image"
+            cat /etc/os-release | grep -E "^(NAME|VERSION|ID)=" | sed "s/^/- /"
+            echo ""
+            echo "## Development Tools"
+            echo "| Tool | Version |"
+            echo "|------|---------|"
+            echo "| Claude Code | $(claude --version 2>/dev/null || echo "N/A") |"
+            echo "| Happy Coder | $(happy --version 2>/dev/null || echo "N/A") |"
+            echo "| Node.js | $(node --version 2>/dev/null || echo "N/A") |"
+            echo "| npm | $(npm --version 2>/dev/null || echo "N/A") |"
+            echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
+            echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
+            echo "| Rust | $(su - workspace -c "rustc --version 2>/dev/null" | cut -d" " -f2 || echo "N/A") |"
+            echo "| rustup | $(su - workspace -c "rustup --version 2>/dev/null" | head -1 | cut -d" " -f2 || echo "N/A") |"
+            echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
+            echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r ".clientVersion.gitVersion" || echo "N/A") |"
+            echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo "N/A") |"
+            echo ""
+            echo "## System Packages"
+            echo "\`\`\`"
+            apk list --installed 2>/dev/null | sort
+            echo "\`\`\`"
+          ' > release-bom/BOM.md
+        else
+          echo "# Bill of Materials (BOM)" > release-bom/BOM.md
+          echo "Release: ${{ needs.create-release.outputs.release_tag }}" >> release-bom/BOM.md
+          echo "" >> release-bom/BOM.md
+          echo "BOM generation failed - image not yet available" >> release-bom/BOM.md
+        fi
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the previous tag
+        CURRENT_TAG="${{ needs.create-release.outputs.release_tag }}"
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${CURRENT_TAG}^ 2>/dev/null || echo "")
+
+        echo "## What's Changed" > CHANGELOG.md
+        echo "" >> CHANGELOG.md
+
+        if [ -n "$PREVIOUS_TAG" ]; then
+          git log ${PREVIOUS_TAG}..${CURRENT_TAG} --pretty=format:"* %s (%h)" >> CHANGELOG.md
+        else
+          git log --pretty=format:"* %s (%h)" >> CHANGELOG.md
+        fi
+
+        echo "" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "## Docker Image" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "\`\`\`bash" >> CHANGELOG.md
+        echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${CURRENT_TAG#v}" >> CHANGELOG.md
+        echo "\`\`\`" >> CHANGELOG.md
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.create-release.outputs.release_tag }}
+        name: Release ${{ needs.create-release.outputs.release_tag }}
+        body_path: CHANGELOG.md
+        files: |
+          release-bom/BOM.md
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

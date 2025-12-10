@@ -86,5 +86,20 @@ log "Container hostname: $(hostname)"
 log "Container IP addresses:"
 ip addr show | grep -E 'inet.*scope global' | awk '{print "  " $2}' || true
 
+# Collect ANTHROPIC_ environment variables to pass to happy daemon
+ANTHROPIC_ENVS=""
+for var in $(env | grep -E "^ANTHROPIC_" | cut -d= -f1); do
+    ANTHROPIC_ENVS="$ANTHROPIC_ENVS $var=${!var}"
+done
+
+# Start Happy daemon as workspace user with ANTHROPIC_ env vars
+log "Starting Happy daemon as workspace user..."
+if [ -n "$ANTHROPIC_ENVS" ]; then
+    log "Propagating ANTHROPIC_* environment variables to Happy daemon"
+    su - workspace -c "env $ANTHROPIC_ENVS happy daemon start" &
+else
+    su - workspace -c "happy daemon start" &
+fi
+
 echo "Accepting connections via SSH..."
 tail -f /dev/null
