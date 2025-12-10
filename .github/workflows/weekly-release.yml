@@ -192,7 +192,12 @@ jobs:
 
         # Try to pull the image and generate BOM
         if docker pull "$IMAGE" 2>/dev/null; then
-          docker run --rm "$IMAGE" sh -c '
+          docker run --rm "$IMAGE" bash -c '
+            # Set PATH to include npm global bin
+            export PATH="/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin:$PATH"
+            NPM_GLOBAL_BIN=$(npm root -g 2>/dev/null)/../bin
+            export PATH="$NPM_GLOBAL_BIN:$PATH"
+
             echo "# Bill of Materials (BOM)"
             echo "Release: ${{ needs.create-release.outputs.release_tag }}"
             echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"

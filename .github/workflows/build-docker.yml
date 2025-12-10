@@ -64,7 +64,12 @@ jobs:
       id: bom
       run: |
         mkdir -p bom
-        docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} sh -c '
+        docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} bash -c '
+          # Set PATH to include npm global bin
+          export PATH="/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin:$PATH"
+          NPM_GLOBAL_BIN=$(npm root -g 2>/dev/null)/../bin
+          export PATH="$NPM_GLOBAL_BIN:$PATH"
+
           echo "# Bill of Materials (BOM) - AMD64"
           echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo ""
@@ -157,7 +162,12 @@ jobs:
       id: bom
       run: |
         mkdir -p bom
-        docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} sh -c '
+        docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} bash -c '
+          # Set PATH to include npm global bin
+          export PATH="/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin:$PATH"
+          NPM_GLOBAL_BIN=$(npm root -g 2>/dev/null)/../bin
+          export PATH="$NPM_GLOBAL_BIN:$PATH"
+
           echo "# Bill of Materials (BOM) - ARM64"
           echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo ""
