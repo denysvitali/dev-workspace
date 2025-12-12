@@ -14,6 +14,7 @@ env:
 jobs:
   build-amd64:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -62,13 +63,23 @@ jobs:
 
     - name: Generate Bill of Materials (BOM)
       id: bom
+      timeout-minutes: 5
       run: |
         mkdir -p bom
         docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} bash -c '
-          # Set PATH to include npm global bin
-          export PATH="/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin:$PATH"
-          NPM_GLOBAL_BIN=$(npm root -g 2>/dev/null)/../bin
-          export PATH="$NPM_GLOBAL_BIN:$PATH"
+          set +e  # Dont exit on error
+
+          # Helper function to get version safely
+          get_version() {
+            local cmd="$1"
+            local result
+            result=$($cmd 2>/dev/null)
+            if [ $? -eq 0 ] && [ -n "$result" ]; then
+              echo "$result"
+            else
+              echo "N/A"
+            fi
+          }
 
           echo "# Bill of Materials (BOM) - AMD64"
           echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -79,14 +90,33 @@ jobs:
           echo "## Development Tools"
           echo "| Tool | Version |"
           echo "|------|---------|"
-          echo "| Claude Code | $(claude --version 2>/dev/null || echo "N/A") |"
-          echo "| Happy Coder | $(happy --version 2>/dev/null || echo "N/A") |"
-          echo "| Node.js | $(node --version 2>/dev/null || echo "N/A") |"
-          echo "| npm | $(npm --version 2>/dev/null || echo "N/A") |"
+
+          # Claude Code - check multiple possible locations
+          CLAUDE_VER="N/A"
+          for p in /usr/local/bin/claude /usr/bin/claude $(npm root -g 2>/dev/null)/../bin/claude; do
+            if [ -x "$p" ]; then
+              CLAUDE_VER=$("$p" --version 2>/dev/null || echo "N/A")
+              break
+            fi
+          done
+          echo "| Claude Code | $CLAUDE_VER |"
+
+          # Happy Coder - check multiple possible locations
+          HAPPY_VER="N/A"
+          for p in /usr/local/bin/happy /usr/bin/happy $(npm root -g 2>/dev/null)/../bin/happy; do
+            if [ -x "$p" ]; then
+              HAPPY_VER=$("$p" --version 2>/dev/null || echo "N/A")
+              break
+            fi
+          done
+          echo "| Happy Coder | $HAPPY_VER |"
+
+          echo "| Node.js | $(get_version "node --version") |"
+          echo "| npm | $(get_version "npm --version") |"
           echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
           echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
-          echo "| Rust | $(su - workspace -c "rustc --version 2>/dev/null" | cut -d" " -f2 || echo "N/A") |"
-          echo "| rustup | $(su - workspace -c "rustup --version 2>/dev/null" | head -1 | cut -d" " -f2 || echo "N/A") |"
+          echo "| Rust | $(su - workspace -c "rustc --version" 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
+          echo "| rustup | $(su - workspace -c "rustup --version" 2>/dev/null | head -1 | cut -d" " -f2 || echo "N/A") |"
           echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
           echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r ".clientVersion.gitVersion" || echo "N/A") |"
           echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo "N/A") |"
@@ -112,6 +142,7 @@ jobs:
 
   build-arm64:
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -160,13 +191,23 @@ jobs:
 
     - name: Generate Bill of Materials (BOM)
       id: bom
+      timeout-minutes: 5
       run: |
         mkdir -p bom
         docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} bash -c '
-          # Set PATH to include npm global bin
-          export PATH="/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin:$PATH"
-          NPM_GLOBAL_BIN=$(npm root -g 2>/dev/null)/../bin
-          export PATH="$NPM_GLOBAL_BIN:$PATH"
+          set +e  # Dont exit on error
+
+          # Helper function to get version safely
+          get_version() {
+            local cmd="$1"
+            local result
+            result=$($cmd 2>/dev/null)
+            if [ $? -eq 0 ] && [ -n "$result" ]; then
+              echo "$result"
+            else
+              echo "N/A"
+            fi
+          }
 
           echo "# Bill of Materials (BOM) - ARM64"
           echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -177,14 +218,33 @@ jobs:
           echo "## Development Tools"
           echo "| Tool | Version |"
           echo "|------|---------|"
-          echo "| Claude Code | $(claude --version 2>/dev/null || echo "N/A") |"
-          echo "| Happy Coder | $(happy --version 2>/dev/null || echo "N/A") |"
-          echo "| Node.js | $(node --version 2>/dev/null || echo "N/A") |"
-          echo "| npm | $(npm --version 2>/dev/null || echo "N/A") |"
+
+          # Claude Code - check multiple possible locations
+          CLAUDE_VER="N/A"
+          for p in /usr/local/bin/claude /usr/bin/claude $(npm root -g 2>/dev/null)/../bin/claude; do
+            if [ -x "$p" ]; then
+              CLAUDE_VER=$("$p" --version 2>/dev/null || echo "N/A")
+              break
+            fi
+          done
+          echo "| Claude Code | $CLAUDE_VER |"
+
+          # Happy Coder - check multiple possible locations
+          HAPPY_VER="N/A"
+          for p in /usr/local/bin/happy /usr/bin/happy $(npm root -g 2>/dev/null)/../bin/happy; do
+            if [ -x "$p" ]; then
+              HAPPY_VER=$("$p" --version 2>/dev/null || echo "N/A")
+              break
+            fi
+          done
+          echo "| Happy Coder | $HAPPY_VER |"
+
+          echo "| Node.js | $(get_version "node --version") |"
+          echo "| npm | $(get_version "npm --version") |"
           echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
           echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
-          echo "| Rust | $(su - workspace -c "rustc --version 2>/dev/null" | cut -d" " -f2 || echo "N/A") |"
-          echo "| rustup | $(su - workspace -c "rustup --version 2>/dev/null" | head -1 | cut -d" " -f2 || echo "N/A") |"
+          echo "| Rust | $(su - workspace -c "rustc --version" 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
+          echo "| rustup | $(su - workspace -c "rustup --version" 2>/dev/null | head -1 | cut -d" " -f2 || echo "N/A") |"
           echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
           echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r ".clientVersion.gitVersion" || echo "N/A") |"
           echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo "N/A") |"
@@ -210,6 +270,7 @@ jobs:
 
   create-manifest:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       packages: write

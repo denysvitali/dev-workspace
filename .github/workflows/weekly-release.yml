@@ -19,6 +19,7 @@ env:
 jobs:
   check-changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       release_tag: ${{ steps.tag.outputs.release_tag }}
@@ -65,6 +66,7 @@ jobs:
     needs: check-changes
     if: needs.check-changes.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
       packages: write
@@ -114,6 +116,7 @@ jobs:
   wait-for-build:
     needs: create-release
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
     - name: Wait for build to complete
       uses: actions/github-script@v7
@@ -154,6 +157,7 @@ jobs:
   generate-release-notes:
     needs: [create-release, wait-for-build]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       packages: read
@@ -184,6 +188,7 @@ jobs:
 
     - name: Generate BOM from image
       id: generate-bom
+      timeout-minutes: 5
       run: |
         TAG="${{ needs.create-release.outputs.release_tag }}"
         IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG#v}"
@@ -193,10 +198,19 @@ jobs:
         # Try to pull the image and generate BOM
         if docker pull "$IMAGE" 2>/dev/null; then
           docker run --rm "$IMAGE" bash -c '
-            # Set PATH to include npm global bin
-            export PATH="/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin:$PATH"
-            NPM_GLOBAL_BIN=$(npm root -g 2>/dev/null)/../bin
-            export PATH="$NPM_GLOBAL_BIN:$PATH"
+            set +e  # Dont exit on error
+
+            # Helper function to get version safely
+            get_version() {
+              local cmd="$1"
+              local result
+              result=$($cmd 2>/dev/null)
+              if [ $? -eq 0 ] && [ -n "$result" ]; then
+                echo "$result"
+              else
+                echo "N/A"
+              fi
+            }
 
             echo "# Bill of Materials (BOM)"
             echo "Release: ${{ needs.create-release.outputs.release_tag }}"
@@ -208,14 +222,33 @@ jobs:
             echo "## Development Tools"
             echo "| Tool | Version |"
             echo "|------|---------|"
-            echo "| Claude Code | $(claude --version 2>/dev/null || echo "N/A") |"
-            echo "| Happy Coder | $(happy --version 2>/dev/null || echo "N/A") |"
-            echo "| Node.js | $(node --version 2>/dev/null || echo "N/A") |"
-            echo "| npm | $(npm --version 2>/dev/null || echo "N/A") |"
+
+            # Claude Code - check multiple possible locations
+            CLAUDE_VER="N/A"
+            for p in /usr/local/bin/claude /usr/bin/claude $(npm root -g 2>/dev/null)/../bin/claude; do
+              if [ -x "$p" ]; then
+                CLAUDE_VER=$("$p" --version 2>/dev/null || echo "N/A")
+                break
+              fi
+            done
+            echo "| Claude Code | $CLAUDE_VER |"
+
+            # Happy Coder - check multiple possible locations
+            HAPPY_VER="N/A"
+            for p in /usr/local/bin/happy /usr/bin/happy $(npm root -g 2>/dev/null)/../bin/happy; do
+              if [ -x "$p" ]; then
+                HAPPY_VER=$("$p" --version 2>/dev/null || echo "N/A")
+                break
+              fi
+            done
+            echo "| Happy Coder | $HAPPY_VER |"
+
+            echo "| Node.js | $(get_version "node --version") |"
+            echo "| npm | $(get_version "npm --version") |"
             echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
             echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
-            echo "| Rust | $(su - workspace -c "rustc --version 2>/dev/null" | cut -d" " -f2 || echo "N/A") |"
-            echo "| rustup | $(su - workspace -c "rustup --version 2>/dev/null" | head -1 | cut -d" " -f2 || echo "N/A") |"
+            echo "| Rust | $(su - workspace -c "rustc --version" 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
+            echo "| rustup | $(su - workspace -c "rustup --version" 2>/dev/null | head -1 | cut -d" " -f2 || echo "N/A") |"
             echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
             echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r ".clientVersion.gitVersion" || echo "N/A") |"
             echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo "N/A") |"
