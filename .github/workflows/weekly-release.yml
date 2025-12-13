@@ -195,73 +195,109 @@ jobs:
 
         mkdir -p release-bom
 
+        # Create a BOM generation script
+        cat > /tmp/generate-bom.sh << 'BOMSCRIPT'
+        #!/bin/bash
+        set +e
+
+        # Function to safely get command version
+        safe_version() {
+          local binary="$1"
+          local args="${2:---version}"
+          if command -v "$binary" >/dev/null 2>&1; then
+            "$binary" $args 2>/dev/null || echo "N/A"
+          else
+            echo "N/A"
+          fi
+        }
+
+        # Function to find npm global binary
+        find_npm_bin() {
+          local name="$1"
+          local npm_prefix
+          npm_prefix=$(npm config get prefix 2>/dev/null)
+          if [ -n "$npm_prefix" ] && [ -x "$npm_prefix/bin/$name" ]; then
+            echo "$npm_prefix/bin/$name"
+          elif [ -x "/usr/local/bin/$name" ]; then
+            echo "/usr/local/bin/$name"
+          elif [ -x "/usr/bin/$name" ]; then
+            echo "/usr/bin/$name"
+          else
+            echo ""
+          fi
+        }
+
+        RELEASE_TAG="$1"
+
+        echo "# Bill of Materials (BOM)"
+        echo "Release: $RELEASE_TAG"
+        echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        echo ""
+        echo "## Base Image"
+        grep -E "^(NAME|VERSION|ID)=" /etc/os-release 2>/dev/null | sed "s/^/- /" || echo "- Unknown"
+        echo ""
+        echo "## Development Tools"
+        echo "| Tool | Version |"
+        echo "|------|---------|"
+
+        # Claude Code
+        CLAUDE_BIN=$(find_npm_bin claude)
+        if [ -n "$CLAUDE_BIN" ] && [ -x "$CLAUDE_BIN" ]; then
+          CLAUDE_VER=$("$CLAUDE_BIN" --version 2>/dev/null || echo "N/A")
+        else
+          CLAUDE_VER="N/A"
+        fi
+        echo "| Claude Code | $CLAUDE_VER |"
+
+        # Happy Coder
+        HAPPY_BIN=$(find_npm_bin happy)
+        if [ -n "$HAPPY_BIN" ] && [ -x "$HAPPY_BIN" ]; then
+          HAPPY_VER=$("$HAPPY_BIN" --version 2>/dev/null || echo "N/A")
+        else
+          HAPPY_VER="N/A"
+        fi
+        echo "| Happy Coder | $HAPPY_VER |"
+
+        echo "| Node.js | $(safe_version node --version) |"
+        echo "| npm | $(safe_version npm --version) |"
+        echo "| Python | $(python3 --version 2>/dev/null | cut -d' ' -f2 || echo 'N/A') |"
+        echo "| Go | $(go version 2>/dev/null | cut -d' ' -f3 || echo 'N/A') |"
+
+        # Rust (installed for workspace user)
+        RUST_VER=$(su - workspace -c "rustc --version" 2>/dev/null | cut -d' ' -f2 || echo "N/A")
+        echo "| Rust | $RUST_VER |"
+
+        RUSTUP_VER=$(su - workspace -c "rustup --version" 2>/dev/null | head -1 | cut -d' ' -f2 || echo "N/A")
+        echo "| rustup | $RUSTUP_VER |"
+
+        echo "| Git | $(git --version 2>/dev/null | cut -d' ' -f3 || echo 'N/A') |"
+        echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r '.clientVersion.gitVersion' 2>/dev/null || echo 'N/A') |"
+        echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d' ' -f3 || echo 'N/A') |"
+
+        # Nix
+        if [ -x /nix/var/nix/profiles/default/bin/nix ]; then
+          NIX_VER=$(/nix/var/nix/profiles/default/bin/nix --version 2>/dev/null | cut -d' ' -f3 || echo "N/A")
+        else
+          NIX_VER="N/A"
+        fi
+        echo "| Nix | $NIX_VER |"
+
+        echo ""
+        echo "## System Packages"
+        echo '```'
+        apk list --installed 2>/dev/null | sort || echo "Unable to list packages"
+        echo '```'
+        BOMSCRIPT
+
+        chmod +x /tmp/generate-bom.sh
+
         # Try to pull the image and generate BOM
         if docker pull "$IMAGE" 2>/dev/null; then
-          docker run --rm "$IMAGE" bash -c '
-            set +e  # Dont exit on error
-
-            # Helper function to get version safely
-            get_version() {
-              local cmd="$1"
-              local result
-              result=$($cmd 2>/dev/null)
-              if [ $? -eq 0 ] && [ -n "$result" ]; then
-                echo "$result"
-              else
-                echo "N/A"
-              fi
-            }
-
-            echo "# Bill of Materials (BOM)"
-            echo "Release: ${{ needs.create-release.outputs.release_tag }}"
-            echo "Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-            echo ""
-            echo "## Base Image"
-            cat /etc/os-release | grep -E "^(NAME|VERSION|ID)=" | sed "s/^/- /"
-            echo ""
-            echo "## Development Tools"
-            echo "| Tool | Version |"
-            echo "|------|---------|"
-
-            # Claude Code - check multiple possible locations
-            CLAUDE_VER="N/A"
-            for p in /usr/local/bin/claude /usr/bin/claude $(npm root -g 2>/dev/null)/../bin/claude; do
-              if [ -x "$p" ]; then
-                CLAUDE_VER=$("$p" --version 2>/dev/null || echo "N/A")
-                break
-              fi
-            done
-            echo "| Claude Code | $CLAUDE_VER |"
-
-            # Happy Coder - check multiple possible locations
-            HAPPY_VER="N/A"
-            for p in /usr/local/bin/happy /usr/bin/happy $(npm root -g 2>/dev/null)/../bin/happy; do
-              if [ -x "$p" ]; then
-                HAPPY_VER=$("$p" --version 2>/dev/null || echo "N/A")
-                break
-              fi
-            done
-            echo "| Happy Coder | $HAPPY_VER |"
-
-            echo "| Node.js | $(get_version "node --version") |"
-            echo "| npm | $(get_version "npm --version") |"
-            echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
-            echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
-            echo "| Rust | $(su - workspace -c "rustc --version" 2>/dev/null | cut -d" " -f2 || echo "N/A") |"
-            echo "| rustup | $(su - workspace -c "rustup --version" 2>/dev/null | head -1 | cut -d" " -f2 || echo "N/A") |"
-            echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
-            echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r ".clientVersion.gitVersion" || echo "N/A") |"
-            echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo "N/A") |"
-            echo "| Nix | $(/nix/var/nix/profiles/default/bin/nix --version 2>/dev/null | cut -d" " -f3 || echo "N/A") |"
-            echo ""
-            echo "## System Packages"
-            echo "\`\`\`"
-            apk list --installed 2>/dev/null | sort
-            echo "\`\`\`"
-          ' > release-bom/BOM.md
+          docker run --rm "$IMAGE" \
+            bash -c "$(cat /tmp/generate-bom.sh)" -- "$TAG" > release-bom/BOM.md 2>&1 || true
         else
           echo "# Bill of Materials (BOM)" > release-bom/BOM.md
-          echo "Release: ${{ needs.create-release.outputs.release_tag }}" >> release-bom/BOM.md
+          echo "Release: $TAG" >> release-bom/BOM.md
           echo "" >> release-bom/BOM.md
           echo "BOM generation failed - image not yet available" >> release-bom/BOM.md
         fi
