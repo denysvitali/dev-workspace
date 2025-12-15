@@ -75,19 +75,18 @@ log "Workspace container started successfully"
 log "Running as user: $(whoami)"
 log "Home directory: $HOME"
 
-# Collect ANTHROPIC_ environment variables for happy daemon
-ANTHROPIC_ENVS=""
-for var in $(env | grep -E "^ANTHROPIC_" | cut -d= -f1); do
-    ANTHROPIC_ENVS="$ANTHROPIC_ENVS $var=${!var}"
-done
-
-# Start Happy daemon (we're already running as workspace user)
-log "Starting Happy daemon..."
-if [ -n "$ANTHROPIC_ENVS" ]; then
-    log "Propagating ANTHROPIC_* environment variables to Happy daemon"
-    env $ANTHROPIC_ENVS happy daemon start &
+# Start Happy daemon if ANTHROPIC_API_KEY is set
+if [ -n "$ANTHROPIC_API_KEY" ]; then
+    log "Starting Happy daemon..."
+    # Collect all ANTHROPIC_ environment variables
+    ANTHROPIC_ENVS=""
+    for var in $(env | grep -E "^ANTHROPIC_" | cut -d= -f1); do
+        ANTHROPIC_ENVS="$ANTHROPIC_ENVS $var=${!var}"
+    done
+    # Start daemon in background, suppress errors if it fails (e.g., not authenticated)
+    (env $ANTHROPIC_ENVS happy daemon start 2>/dev/null || log "Happy daemon not started (may need authentication)") &
 else
-    happy daemon start &
+    log "ANTHROPIC_API_KEY not set, skipping Happy daemon"
 fi
 
 log "Accepting connections via SSH on port 2222..."
