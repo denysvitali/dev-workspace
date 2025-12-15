@@ -66,39 +66,8 @@ jobs:
       timeout-minutes: 5
       run: |
         mkdir -p bom
-
-        # Generate BOM with simple inline commands - no complex script passing
         docker run --rm --entrypoint "" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} \
-          /bin/sh -c 'echo "# Bill of Materials (BOM) - AMD64"
-echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo ""
-echo "## Base Image"
-grep -E "^(NAME|VERSION|ID)=" /etc/os-release 2>/dev/null | sed "s/^/- /" || echo "- Unknown"
-echo ""
-echo "## Development Tools"
-echo "| Tool | Version |"
-echo "|------|---------|"
-NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr")
-echo "| Claude Code | $($NPM_PREFIX/bin/claude --version 2>/dev/null || echo N/A) |"
-echo "| Happy Coder | $($NPM_PREFIX/bin/happy --version 2>/dev/null || echo N/A) |"
-echo "| Node.js | $(node --version 2>/dev/null || echo N/A) |"
-echo "| npm | $(npm --version 2>/dev/null || echo N/A) |"
-echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo N/A) |"
-echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
-echo "| Rust | N/A (workspace user only) |"
-echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
-echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r .clientVersion.gitVersion || echo N/A) |"
-echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo N/A) |"
-echo "| Nix | $(/home/workspace/.nix-profile/bin/nix --version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
-echo "| devenv | $(/home/workspace/.nix-profile/bin/devenv version 2>/dev/null || echo N/A) |"
-echo ""
-echo "## System Packages"
-echo "\`\`\`"
-apk list --installed 2>/dev/null | head -50 || echo "Unable to list packages"
-echo "... (truncated)"
-echo "\`\`\`"' > bom/bom-amd64.md 2>&1 || echo "BOM generation failed" > bom/bom-amd64.md
-
-        # Also output to step summary
+          generate-bom AMD64 > bom/bom-amd64.md 2>&1 || echo "BOM generation failed" > bom/bom-amd64.md
         echo "## Bill of Materials (AMD64)" >> $GITHUB_STEP_SUMMARY
         cat bom/bom-amd64.md >> $GITHUB_STEP_SUMMARY
       if: github.event_name != 'pull_request'
@@ -164,39 +133,8 @@ echo "\`\`\`"' > bom/bom-amd64.md 2>&1 || echo "BOM generation failed" > bom/bom
       timeout-minutes: 5
       run: |
         mkdir -p bom
-
-        # Generate BOM with simple inline commands - no complex script passing
         docker run --rm --entrypoint "" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} \
-          /bin/sh -c 'echo "# Bill of Materials (BOM) - ARM64"
-echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo ""
-echo "## Base Image"
-grep -E "^(NAME|VERSION|ID)=" /etc/os-release 2>/dev/null | sed "s/^/- /" || echo "- Unknown"
-echo ""
-echo "## Development Tools"
-echo "| Tool | Version |"
-echo "|------|---------|"
-NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr")
-echo "| Claude Code | $($NPM_PREFIX/bin/claude --version 2>/dev/null || echo N/A) |"
-echo "| Happy Coder | $($NPM_PREFIX/bin/happy --version 2>/dev/null || echo N/A) |"
-echo "| Node.js | $(node --version 2>/dev/null || echo N/A) |"
-echo "| npm | $(npm --version 2>/dev/null || echo N/A) |"
-echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo N/A) |"
-echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
-echo "| Rust | N/A (workspace user only) |"
-echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
-echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r .clientVersion.gitVersion || echo N/A) |"
-echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo N/A) |"
-echo "| Nix | $(/home/workspace/.nix-profile/bin/nix --version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
-echo "| devenv | $(/home/workspace/.nix-profile/bin/devenv version 2>/dev/null || echo N/A) |"
-echo ""
-echo "## System Packages"
-echo "\`\`\`"
-apk list --installed 2>/dev/null | head -50 || echo "Unable to list packages"
-echo "... (truncated)"
-echo "\`\`\`"' > bom/bom-arm64.md 2>&1 || echo "BOM generation failed" > bom/bom-arm64.md
-
-        # Also output to step summary
+          generate-bom ARM64 > bom/bom-arm64.md 2>&1 || echo "BOM generation failed" > bom/bom-arm64.md
         echo "## Bill of Materials (ARM64)" >> $GITHUB_STEP_SUMMARY
         cat bom/bom-arm64.md >> $GITHUB_STEP_SUMMARY
       if: github.event_name != 'pull_request'

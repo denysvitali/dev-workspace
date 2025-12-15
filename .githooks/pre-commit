@@ -1,0 +1,80 @@
+#!/bin/sh
+# Pre-commit hook to validate YAML files
+# Install: git config core.hooksPath .githooks
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+echo "Running pre-commit checks..."
+
+# Check if yamllint is available
+if command -v yamllint >/dev/null 2>&1; then
+    YAML_LINTER="yamllint"
+elif command -v python3 >/dev/null 2>&1 && python3 -c "import yamllint" 2>/dev/null; then
+    YAML_LINTER="python3 -m yamllint"
+else
+    echo "${RED}Warning: yamllint not found, skipping YAML validation${NC}"
+    echo "Install with: pip install yamllint"
+    YAML_LINTER=""
+fi
+
+# Get list of staged YAML files
+YAML_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ya?ml)$' || true)
+
+if [ -n "$YAML_FILES" ] && [ -n "$YAML_LINTER" ]; then
+    echo "Validating YAML files..."
+    FAILED=0
+
+    for file in $YAML_FILES; do
+        if [ -f "$file" ]; then
+            if $YAML_LINTER -c .yamllint.yaml "$file" >/dev/null 2>&1; then
+                echo "${GREEN}✓${NC} $file"
+            else
+                echo "${RED}✗${NC} $file"
+                $YAML_LINTER -c .yamllint.yaml "$file" 2>&1 | head -20
+                FAILED=1
+            fi
+        fi
+    done
+
+    if [ $FAILED -eq 1 ]; then
+        echo ""
+        echo "${RED}YAML validation failed. Please fix the errors above.${NC}"
+        exit 1
+    fi
+fi
+
+# Validate GitHub Actions workflows specifically
+GH_WORKFLOWS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^\.github/workflows/.*\.ya?ml$' || true)
+
+if [ -n "$GH_WORKFLOWS" ]; then
+    echo "Validating GitHub Actions workflows..."
+    for file in $GH_WORKFLOWS; do
+        if [ -f "$file" ]; then
+            # Basic YAML syntax check using yq or python
+            if command -v yq >/dev/null 2>&1; then
+                if yq eval '.' "$file" >/dev/null 2>&1; then
+                    echo "${GREEN}✓${NC} $file (syntax OK)"
+                else
+                    echo "${RED}✗${NC} $file (YAML syntax error)"
+                    yq eval '.' "$file" 2>&1
+                    exit 1
+                fi
+            elif command -v python3 >/dev/null 2>&1; then
+                if python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null; then
+                    echo "${GREEN}✓${NC} $file (syntax OK)"
+                else
+                    echo "${RED}✗${NC} $file (YAML syntax error)"
+                    python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>&1
+                    exit 1
+                fi
+            fi
+        fi
+    done
+fi
+
+echo "${GREEN}All pre-commit checks passed!${NC}"

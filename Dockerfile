@@ -110,6 +110,10 @@ RUN mkdir -p /home/workspace/.ssh && \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Copy BOM generation script
+COPY scripts/generate-bom.sh /usr/local/bin/generate-bom
+RUN chmod +x /usr/local/bin/generate-bom
+
 # Set working directory
 WORKDIR /workspace
 
