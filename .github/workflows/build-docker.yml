@@ -67,7 +67,7 @@ jobs:
       run: |
         mkdir -p bom
         docker run --rm --entrypoint "" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} \
-          generate-bom AMD64 > bom/bom-amd64.md 2>&1 || echo "BOM generation failed" > bom/bom-amd64.md
+          generate-bom AMD64 > bom/bom-amd64.md || echo "BOM generation failed" > bom/bom-amd64.md
         echo "## Bill of Materials (AMD64)" >> $GITHUB_STEP_SUMMARY
         cat bom/bom-amd64.md >> $GITHUB_STEP_SUMMARY
       if: github.event_name != 'pull_request'
@@ -134,7 +134,7 @@ jobs:
       run: |
         mkdir -p bom
         docker run --rm --entrypoint "" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }} \
-          generate-bom ARM64 > bom/bom-arm64.md 2>&1 || echo "BOM generation failed" > bom/bom-arm64.md
+          generate-bom ARM64 > bom/bom-arm64.md || echo "BOM generation failed" > bom/bom-arm64.md
         echo "## Bill of Materials (ARM64)" >> $GITHUB_STEP_SUMMARY
         cat bom/bom-arm64.md >> $GITHUB_STEP_SUMMARY
       if: github.event_name != 'pull_request'

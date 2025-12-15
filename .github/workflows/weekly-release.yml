@@ -195,7 +195,7 @@ jobs:
         mkdir -p release-bom
         if docker pull "$IMAGE" 2>/dev/null; then
           docker run --rm --entrypoint "" "$IMAGE" \
-            generate-bom Release "$TAG" > release-bom/BOM.md 2>&1 || echo "BOM generation failed" > release-bom/BOM.md
+            generate-bom Release "$TAG" > release-bom/BOM.md || echo "BOM generation failed" > release-bom/BOM.md
         else
           echo "# Bill of Materials (BOM)" > release-bom/BOM.md
           echo "Release: $TAG" >> release-bom/BOM.md

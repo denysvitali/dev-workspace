@@ -7,6 +7,11 @@
 ARCH="${1:-Unknown}"
 RELEASE_TAG="${2:-}"
 
+# Helper function to get version safely (suppress interactive prompts)
+get_version() {
+    timeout 5 "$@" 2>/dev/null </dev/null | head -1 || echo "N/A"
+}
+
 echo "# Bill of Materials (BOM) - ${ARCH}"
 if [ -n "$RELEASE_TAG" ]; then
     echo "Release: ${RELEASE_TAG}"
@@ -20,18 +25,21 @@ echo "## Development Tools"
 echo "| Tool | Version |"
 echo "|------|---------|"
 NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr")
-echo "| Claude Code | $($NPM_PREFIX/bin/claude --version 2>/dev/null || echo N/A) |"
-echo "| Happy Coder | $($NPM_PREFIX/bin/happy --version 2>/dev/null || echo N/A) |"
-echo "| Node.js | $(node --version 2>/dev/null || echo N/A) |"
-echo "| npm | $(npm --version 2>/dev/null || echo N/A) |"
-echo "| Python | $(python3 --version 2>/dev/null | cut -d" " -f2 || echo N/A) |"
-echo "| Go | $(go version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
+CLAUDE_VERSION=$(get_version $NPM_PREFIX/bin/claude --version)
+# Happy requires TTY, just check if it exists
+HAPPY_VERSION=$($NPM_PREFIX/bin/happy --help 2>/dev/null </dev/null | head -1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "installed")
+echo "| Claude Code | ${CLAUDE_VERSION} |"
+echo "| Happy Coder | ${HAPPY_VERSION} |"
+echo "| Node.js | $(get_version node --version) |"
+echo "| npm | $(get_version npm --version) |"
+echo "| Python | $(python3 --version 2>/dev/null | cut -d' ' -f2 || echo N/A) |"
+echo "| Go | $(go version 2>/dev/null | cut -d' ' -f3 || echo N/A) |"
 echo "| Rust | N/A (workspace user only) |"
-echo "| Git | $(git --version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
+echo "| Git | $(git --version 2>/dev/null | cut -d' ' -f3 || echo N/A) |"
 echo "| kubectl | $(kubectl version --client -o json 2>/dev/null | jq -r .clientVersion.gitVersion || echo N/A) |"
-echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d" " -f3 || echo N/A) |"
-echo "| Nix | $(/home/workspace/.nix-profile/bin/nix --version 2>/dev/null | cut -d" " -f3 || echo N/A) |"
-echo "| devenv | $(/home/workspace/.nix-profile/bin/devenv version 2>/dev/null || echo N/A) |"
+echo "| GitHub CLI | $(gh --version 2>/dev/null | head -1 | cut -d' ' -f3 || echo N/A) |"
+echo "| Nix | $(get_version /home/workspace/.nix-profile/bin/nix --version | cut -d' ' -f3) |"
+echo "| devenv | $(get_version /home/workspace/.nix-profile/bin/devenv version) |"
 echo ""
 echo "## System Packages"
 echo "\`\`\`"
