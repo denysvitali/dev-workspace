@@ -8,8 +8,8 @@ RUN apk update && apk upgrade && apk add --no-cache \
     git-doc \
     dropbear \
     dropbear-dbclient \
-    dropbear-scp \
     mosh \
+    openssh-client \
     sudo \
     vim \
     nano \
