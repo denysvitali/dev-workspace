@@ -6,8 +6,9 @@ RUN apk update && apk upgrade && apk add --no-cache \
     wget \
     git \
     git-doc \
-    openssh \
-    openssh-client \
+    dropbear \
+    dropbear-dbclient \
+    dropbear-scp \
     mosh \
     sudo \
     vim \
@@ -89,10 +90,21 @@ RUN addgroup workspace && \
     adduser -D -s /bin/bash -G workspace workspace && \
     chown workspace:workspace /workspace
 
-# Setup SSH
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
-    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+# Setup dropbear SSH
+# Create directory for host keys (will be a volume mount point)
+RUN mkdir -p /etc/dropbear && \
+    chown workspace:workspace /etc/dropbear
+
+# Pre-generate host keys at build time (can be overridden by volume mount)
+RUN dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key && \
+    dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key && \
+    dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key && \
+    chown workspace:workspace /etc/dropbear/dropbear_*_host_key
+
+# Setup SSH directory for workspace user
+RUN mkdir -p /home/workspace/.ssh && \
+    chmod 700 /home/workspace/.ssh && \
+    chown workspace:workspace /home/workspace/.ssh
 
 # Create startup script
 COPY entrypoint.sh /entrypoint.sh
@@ -116,31 +128,24 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
     rustup component add rustfmt clippy
 USER root
 
-# Install Nix package manager (multi-user installation)
-RUN mkdir -p /nix && chown root:root /nix && \
-    # Create nixbld group and users for multi-user Nix
-    addgroup -g 30000 nixbld && \
-    for i in $(seq 1 10); do \
-        adduser -S -D -H -h /var/empty -g "Nix build user $i" -s /sbin/nologin -G nixbld -u $((30000 + i)) nixbld$i; \
-    done && \
-    # Add workspace user to nix-users group for access
-    addgroup nix-users && \
-    adduser workspace nix-users
+# Install Nix package manager (single-user installation for non-root operation)
+RUN mkdir -p /nix && chown workspace:workspace /nix
 
-# Install Nix using the official installer
-RUN curl -L https://nixos.org/nix/install | sh -s -- --daemon --yes && \
-    # Source nix profile and configure for multi-user
-    . /etc/profile.d/nix.sh && \
-    # Create nix.conf with flakes and nix-command enabled
-    mkdir -p /etc/nix && \
-    echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf && \
-    echo "trusted-users = root workspace" >> /etc/nix/nix.conf && \
-    echo "allowed-users = *" >> /etc/nix/nix.conf
+# Install Nix as workspace user (single-user mode - no daemon required)
+USER workspace
+RUN curl -L https://nixos.org/nix/install | sh -s -- --no-daemon && \
+    # Configure Nix with flakes enabled
+    mkdir -p ~/.config/nix && \
+    echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
 
-# Add Nix to PATH for all users
-ENV PATH="/nix/var/nix/profiles/default/bin:$PATH"
+# Add Nix to PATH for workspace user
+ENV PATH="/home/workspace/.nix-profile/bin:$PATH"
 
-# Setup shell configuration with useful aliases
+# Install devenv via nix profile
+RUN . ~/.nix-profile/etc/profile.d/nix.sh && \
+    nix profile install nixpkgs#devenv
+
+# Setup shell configuration with useful aliases for workspace user
 RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \
     echo 'alias la="exa -la"' >> ~/.bashrc && \
     echo 'alias lt="exa --tree"' >> ~/.bashrc && \
@@ -156,9 +161,11 @@ RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \
     echo 'alias gb="git branch"' >> ~/.bashrc && \
     echo 'export FZF_DEFAULT_COMMAND="fd --type f"' >> ~/.bashrc && \
     echo 'export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"' >> ~/.bashrc && \
-    echo 'source /usr/share/bash-completion/bash_completion' >> ~/.bashrc
+    echo 'source /usr/share/bash-completion/bash_completion' >> ~/.bashrc && \
+    # Source Nix environment in bashrc \
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> ~/.bashrc
 
-# Setup git configuration
+# Setup git configuration for workspace user
 RUN git config --global init.defaultBranch main && \
     git config --global user.name "workspace" && \
     git config --global user.email "workspace@localhost" && \
@@ -166,21 +173,22 @@ RUN git config --global init.defaultBranch main && \
     git config --global push.default simple && \
     git config --global pull.rebase false
 
-# Create common directories
-RUN mkdir -p ~/go/src ~/go/bin ~/go/pkg ~/.local/bin ~/.ssh ~/.config
+# Create common directories for workspace user
+RUN mkdir -p ~/go/src ~/go/bin ~/go/pkg ~/.local/bin ~/.config
 
-# Expose SSH and Mosh ports
-EXPOSE 22
+# Expose SSH (high port for non-root) and Mosh ports
+EXPOSE 2222
 EXPOSE 60000-61000/udp
 
 # Add comprehensive health check
 HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
     CMD bash -c ' \
-        # Check if SSH daemon is running \
-        pgrep sshd > /dev/null || exit 1; \
+        # Check if dropbear SSH daemon is running \
+        pgrep dropbear > /dev/null || exit 1; \
         # Check if workspace user shell is accessible \
-        su - workspace -c "whoami" > /dev/null || exit 1; \
+        whoami > /dev/null || exit 1; \
         echo "All services healthy" \
     '
 
+# Already running as workspace user from Nix installation
 ENTRYPOINT ["/entrypoint.sh"]

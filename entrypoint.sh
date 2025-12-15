@@ -13,49 +13,20 @@ error_exit() {
     exit 1
 }
 
-# Function to retry commands
-retry() {
-    local retries=$1
-    shift
-    local count=0
-
-    until "$@"; do
-        exit_code=$?
-        count=$((count + 1))
-        if [ $count -lt $retries ]; then
-            log "Command failed (attempt $count/$retries). Retrying in 5 seconds..."
-            sleep 5
-        else
-            error_exit "Command failed after $retries attempts: $*"
-        fi
-    done
-}
-
 # Signal handler for graceful shutdown
 cleanup() {
     log "Received shutdown signal, cleaning up..."
+    # Kill dropbear if running
+    if [ -n "$DROPBEAR_PID" ]; then
+        kill "$DROPBEAR_PID" 2>/dev/null || true
+    fi
     log "Container shutting down gracefully"
     exit 0
 }
 
 trap cleanup SIGTERM SIGINT
 
-log "Starting workspace container..."
-
-# Generate SSH host keys if they don't exist
-if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
-    log "Generating SSH host keys..."
-    ssh-keygen -A
-fi
-
-# Start sshd daemon in the background
-/usr/sbin/sshd -D &
-
-# Start Nix daemon if available
-if [ -x /nix/var/nix/profiles/default/bin/nix-daemon ]; then
-    log "Starting Nix daemon..."
-    /nix/var/nix/profiles/default/bin/nix-daemon &
-fi
+log "Starting workspace container as user: $(whoami)"
 
 # Setup SSH keys if provided
 if [ -n "$SSH_PUBLIC_KEY" ]; then
@@ -66,46 +37,60 @@ if [ -n "$SSH_PUBLIC_KEY" ]; then
         error_exit "Invalid SSH public key format"
     fi
 
-    mkdir -p /home/workspace/.ssh
-    echo "$SSH_PUBLIC_KEY" > /home/workspace/.ssh/authorized_keys
-    chmod 600 /home/workspace/.ssh/authorized_keys
-    chmod 700 /home/workspace/.ssh
-    chown -R workspace:workspace /home/workspace/.ssh
+    # Create .ssh directory if it doesn't exist (should already exist from Dockerfile)
+    mkdir -p "$HOME/.ssh"
+    echo "$SSH_PUBLIC_KEY" > "$HOME/.ssh/authorized_keys"
+    chmod 600 "$HOME/.ssh/authorized_keys"
+    chmod 700 "$HOME/.ssh"
     log "SSH public key configured"
 fi
 
-# Set workspace name if provided
+# Start dropbear SSH daemon on port 2222 (non-privileged port)
+# -F: Don't fork (foreground mode for signal handling)
+# -E: Log to stderr instead of syslog
+# -p: Port to listen on
+# -r: Host key files
+# -s: Disable password logins
+# -g: Disable password logins for root
+log "Starting dropbear SSH daemon on port 2222..."
+dropbear -F -E -p 2222 \
+    -r /etc/dropbear/dropbear_rsa_host_key \
+    -r /etc/dropbear/dropbear_ecdsa_host_key \
+    -r /etc/dropbear/dropbear_ed25519_host_key \
+    -s -g &
+DROPBEAR_PID=$!
+
+# Set workspace name if provided (just for display, can't change hostname without root)
 if [ -n "$WORKSPACE_NAME" ]; then
-    log "Setting workspace name to: $WORKSPACE_NAME"
-    hostnamectl set-hostname "$WORKSPACE_NAME" 2>/dev/null || true
+    log "Workspace name: $WORKSPACE_NAME"
 fi
 
 # Initialize Claude Code if API key is provided
 if [ -n "$ANTHROPIC_API_KEY" ]; then
     log "Claude Code API key provided, setting up..."
     export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
-    # Claude Code will use the API key from environment variable
 fi
 
 log "Workspace container started successfully"
-log "Container hostname: $(hostname)"
-log "Container IP addresses:"
-ip addr show | grep -E 'inet.*scope global' | awk '{print "  " $2}' || true
+log "Running as user: $(whoami)"
+log "Home directory: $HOME"
 
-# Collect ANTHROPIC_ environment variables to pass to happy daemon
+# Collect ANTHROPIC_ environment variables for happy daemon
 ANTHROPIC_ENVS=""
 for var in $(env | grep -E "^ANTHROPIC_" | cut -d= -f1); do
     ANTHROPIC_ENVS="$ANTHROPIC_ENVS $var=${!var}"
 done
 
-# Start Happy daemon as workspace user with ANTHROPIC_ env vars
-log "Starting Happy daemon as workspace user..."
+# Start Happy daemon (we're already running as workspace user)
+log "Starting Happy daemon..."
 if [ -n "$ANTHROPIC_ENVS" ]; then
     log "Propagating ANTHROPIC_* environment variables to Happy daemon"
-    su - workspace -c "env $ANTHROPIC_ENVS happy daemon start" &
+    env $ANTHROPIC_ENVS happy daemon start &
 else
-    su - workspace -c "happy daemon start" &
+    happy daemon start &
 fi
 
-echo "Accepting connections via SSH..."
-tail -f /dev/null
+log "Accepting connections via SSH on port 2222..."
+
+# Wait for dropbear to exit (or signal)
+wait $DROPBEAR_PID
