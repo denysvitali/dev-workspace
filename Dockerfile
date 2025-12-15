@@ -91,15 +91,11 @@ RUN addgroup workspace && \
     chown workspace:workspace /workspace
 
 # Setup dropbear SSH
-# Create directory for host keys (will be a volume mount point)
+# Create directory for host keys (will be generated at runtime or mounted as volume)
 RUN mkdir -p /etc/dropbear && \
     chown workspace:workspace /etc/dropbear
-
-# Pre-generate host keys at build time (can be overridden by volume mount)
-RUN dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key && \
-    dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key && \
-    dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key && \
-    chown workspace:workspace /etc/dropbear/dropbear_*_host_key
+# NOTE: Host keys are generated at runtime in entrypoint.sh for security
+# Each container instance gets unique keys unless a volume is mounted
 
 # Setup SSH directory for workspace user
 RUN mkdir -p /home/workspace/.ssh && \
