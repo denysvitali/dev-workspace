@@ -197,10 +197,9 @@ jobs:
 
         # Try to pull the image and generate BOM with simple inline commands
         if docker pull "$IMAGE" 2>/dev/null; then
-          docker run --rm --entrypoint "" "$IMAGE" \
-            /bin/sh -c 'TAG="'"$TAG"'"
-echo "# Bill of Materials (BOM)"
-echo "Release: $TAG"
+          docker run --rm --entrypoint "" -e "RELEASE_TAG=$TAG" "$IMAGE" \
+            /bin/sh -c 'echo "# Bill of Materials (BOM)"
+echo "Release: $RELEASE_TAG"
 echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo ""
 echo "## Base Image"
