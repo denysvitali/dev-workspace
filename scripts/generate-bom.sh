@@ -26,8 +26,8 @@ echo "| Tool | Version |"
 echo "|------|---------|"
 NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr")
 CLAUDE_VERSION=$(get_version $NPM_PREFIX/bin/claude --version)
-# Happy requires TTY, just check if it exists
-HAPPY_VERSION=$($NPM_PREFIX/bin/happy --help 2>/dev/null </dev/null | head -1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "installed")
+# Happy requires TTY for --version, get version from package.json instead
+HAPPY_VERSION=$(npm list -g happy-coder 2>/dev/null | grep happy-coder | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "N/A")
 echo "| Claude Code | ${CLAUDE_VERSION} |"
 echo "| Happy Coder | ${HAPPY_VERSION} |"
 echo "| Node.js | $(get_version node --version) |"
