@@ -29,15 +29,27 @@ trap cleanup SIGTERM SIGINT
 log "Starting workspace container as user: $(whoami)"
 
 # Generate SSH host keys if they don't exist
-# This ensures each container instance has unique keys for security
-if [ ! -f /etc/dropbear/dropbear_ed25519_host_key ]; then
-    log "Generating SSH host keys..."
+# Keys may already exist if /etc/dropbear is mounted from a PVC
+KEYS_GENERATED=0
+if [ ! -f /etc/dropbear/dropbear_rsa_host_key ]; then
+    log "Generating RSA host key..."
     dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key 2>/dev/null
+    KEYS_GENERATED=1
+fi
+if [ ! -f /etc/dropbear/dropbear_ecdsa_host_key ]; then
+    log "Generating ECDSA host key..."
     dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key 2>/dev/null
+    KEYS_GENERATED=1
+fi
+if [ ! -f /etc/dropbear/dropbear_ed25519_host_key ]; then
+    log "Generating Ed25519 host key..."
     dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key 2>/dev/null
-    log "SSH host keys generated"
+    KEYS_GENERATED=1
+fi
+if [ $KEYS_GENERATED -eq 0 ]; then
+    log "Using existing SSH host keys from volume"
 else
-    log "Using existing SSH host keys"
+    log "SSH host keys ready"
 fi
 
 # Setup SSH keys if provided
