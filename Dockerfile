@@ -165,7 +165,9 @@ RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \
     echo 'export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"' >> ~/.bashrc && \
     echo 'source /usr/share/bash-completion/bash_completion' >> ~/.bashrc && \
     # Source Nix environment in bashrc \
-    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> ~/.bashrc
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> ~/.bashrc && \
+    # Also add to .profile for login shells (SSH) \
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> ~/.profile
 
 # Setup git configuration for workspace user
 RUN git config --global init.defaultBranch main && \
