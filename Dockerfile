@@ -88,7 +88,8 @@ RUN mkdir -p /workspace
 # Create workspace user and group (non-privileged)
 RUN addgroup workspace && \
     adduser -D -s /bin/bash -G workspace workspace && \
-    chown workspace:workspace /workspace
+    chown workspace:workspace /workspace && \
+    chown workspace:workspace /home/workspace
 
 # Setup dropbear SSH
 # Create directory for host keys (will be generated at runtime or mounted as volume)
