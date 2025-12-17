@@ -102,13 +102,13 @@ log "Home directory: $HOME"
 # Start Happy daemon if ANTHROPIC_API_KEY is set
 if [ -n "$ANTHROPIC_API_KEY" ]; then
     log "Starting Happy daemon..."
-    # Collect all ANTHROPIC_ environment variables
-    ANTHROPIC_ENVS=""
-    for var in $(env | grep -E "^ANTHROPIC_" | cut -d= -f1); do
-        ANTHROPIC_ENVS="$ANTHROPIC_ENVS $var=${!var}"
+    # Collect all ANTHROPIC_ and HAPPY_ environment variables
+    DAEMON_ENVS=""
+    for var in $(env | grep -E "^(ANTHROPIC_|HAPPY_)" | cut -d= -f1); do
+        DAEMON_ENVS="$DAEMON_ENVS $var=${!var}"
     done
     # Start daemon in background, suppress errors if it fails (e.g., not authenticated)
-    (env $ANTHROPIC_ENVS happy daemon start 2>/dev/null || log "Happy daemon not started (may need authentication)") &
+    (env $DAEMON_ENVS happy daemon start 2>/dev/null || log "Happy daemon not started (may need authentication)") &
 else
     log "ANTHROPIC_API_KEY not set, skipping Happy daemon"
 fi
