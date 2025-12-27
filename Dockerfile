@@ -87,7 +87,7 @@ RUN npm install -g happy-coder @anthropic-ai/claude-code
 RUN echo "workspace:x:1000:" >> /etc/group
 RUN echo "workspace:x:1000:1000:workspace:/home/workspace:/bin/bash" >> /etc/passwd
 RUN mkdir -p /home/workspace && chown workspace:workspace /home/workspace
-RUN ls -la /workspace && chown -R workspace:workspace /workspace
+RUN mkdir -p /workspace && ls -la /workspace && chown -R workspace:workspace /workspace
 
 # Setup dropbear SSH
 # Create directory for host keys (will be generated at runtime or mounted as volume)
