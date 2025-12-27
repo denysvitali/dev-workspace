@@ -83,9 +83,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN npm install -g happy-coder @anthropic-ai/claude-code
 
 # Create workspace user and group (non-privileged)
-RUN addgroup -S workspace && \
-    useradd -m -s /bin/bash -G workspace workspace && \
-    chown workspace:workspace /workspace
+RUN addgroup -S workspace
+RUN useradd -m -s /bin/bash -G workspace workspace
+RUN chown workspace:workspace /workspace
 
 # Setup dropbear SSH
 # Create directory for host keys (will be generated at runtime or mounted as volume)
