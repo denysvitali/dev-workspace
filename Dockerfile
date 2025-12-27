@@ -87,14 +87,6 @@ RUN addgroup workspace && \
     adduser -D -s /bin/bash -G workspace workspace && \
     chown workspace:workspace /workspace
 
-# Move home contents to template location before /home is PVC-mounted at runtime
-# entrypoint.sh will sync these contents to the PVC-mounted /home/workspace
-RUN mkdir -p /home && \
-    mv /home/workspace /home/template && \
-    mkdir -p /home/workspace && \
-    chown workspace:workspace /home/workspace && \
-    chmod 750 /home/workspace
-
 # Setup dropbear SSH
 # Create directory for host keys (will be generated at runtime or mounted as volume)
 RUN mkdir -p /etc/dropbear && \
@@ -182,6 +174,16 @@ RUN git config --global init.defaultBranch main && \
 
 # Create common directories for workspace user
 RUN mkdir -p ~/go/src ~/go/bin ~/go/pkg ~/.local/bin ~/.config
+
+# Move home contents to template location before /home is PVC-mounted at runtime
+# entrypoint.sh will sync these contents to the PVC-mounted /home/workspace
+USER root
+RUN mkdir -p /home && \
+    mv /home/workspace /home/template && \
+    mkdir -p /home/workspace && \
+    chown workspace:workspace /home/workspace && \
+    chmod 750 /home/workspace
+USER workspace
 
 # Expose SSH (high port for non-root) and Mosh ports
 EXPOSE 2222
