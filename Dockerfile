@@ -89,7 +89,8 @@ RUN addgroup workspace && \
 
 # Move home contents to template location before /home is PVC-mounted at runtime
 # entrypoint.sh will sync these contents to the PVC-mounted /home/workspace
-RUN mv /home/workspace /home/template && \
+RUN mkdir -p /home && \
+    mv /home/workspace /home/template && \
     mkdir -p /home/workspace && \
     chown workspace:workspace /home/workspace && \
     chmod 750 /home/workspace
