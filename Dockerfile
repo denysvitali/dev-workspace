@@ -83,9 +83,8 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN npm install -g happy-coder @anthropic-ai/claude-code
 
 # Create workspace user and group (non-privileged)
-RUN echo "Testing basic command" && \
-    (addgroup -S -g 1000 workspace 2>/dev/null || true) && \
-    (id workspace 2>/dev/null || useradd -m -u 1000 -g 1000 -s /bin/bash -G workspace workspace)
+RUN addgroup -S -g 1000 workspace 2>/dev/null || true
+RUN useradd -m -u 1000 -g 1000 -s /bin/bash -G workspace workspace 2>/dev/null || true
 RUN chown workspace:workspace /workspace
 
 # Setup dropbear SSH
