@@ -86,8 +86,8 @@ RUN npm install -g happy-coder @anthropic-ai/claude-code
 # Manually create group and user to avoid busybox useradd issues
 RUN echo "workspace:x:1000:" >> /etc/group
 RUN echo "workspace:x:1000:1000:workspace:/home/workspace:/bin/bash" >> /etc/passwd
-RUN mkdir -p /home/workspace && chown 1000:1000 /home/workspace
-RUN chown -R 1000:1000 /workspace
+RUN mkdir -p /home/workspace && chown workspace:workspace /home/workspace
+RUN chown -R workspace:workspace /workspace
 
 # Setup dropbear SSH
 # Create directory for host keys (will be generated at runtime or mounted as volume)
