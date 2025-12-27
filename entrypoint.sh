@@ -28,6 +28,39 @@ trap cleanup SIGTERM SIGINT
 
 log "Starting workspace container as user: $(whoami)"
 
+# Sync fresh image home contents to PVC-mounted /home
+# The original home contents were moved to /home/template during build
+# Skip .gitconfig as users may have custom configurations
+log "Syncing home directory contents from image to PVC..."
+FRESH_HOME="/home/template"
+
+# Sync fresh contents to PVC-mounted /home, preserving existing user files
+if [ -d "$FRESH_HOME" ] && [ -n "$(ls -A "$FRESH_HOME" 2>/dev/null)" ]; then
+    log "Syncing fresh home contents to PVC mount..."
+
+    # Preserve SSH directory if it exists (user keys are already there or will be configured)
+    if [ -d "$HOME/.ssh" ]; then
+        mkdir -p "$FRESH_HOME/.ssh"
+        cp -a "$HOME/.ssh/." "$FRESH_HOME/.ssh/" 2>/dev/null || true
+    fi
+
+    # Use rsync to sync fresh contents, skipping .gitconfig and preserving existing files
+    # --ignore-existing preserves user-created/modified files
+    # Exclude .gitconfig as requested
+    rsync -a --ignore-existing --exclude='.gitconfig' "$FRESH_HOME/" "$HOME/" 2>/dev/null || {
+        # Fallback if rsync fails (e.g., first deployment with empty PVC)
+        cp -a "$FRESH_HOME/." "$HOME/" 2>/dev/null || true
+    }
+
+    # Ensure .ssh directory has correct permissions
+    if [ -d "$HOME/.ssh" ]; then
+        chmod 700 "$HOME/.ssh"
+        chmod 600 "$HOME/.ssh/authorized_keys" 2>/dev/null || true
+    fi
+
+    log "Home directory sync complete"
+fi
+
 # Generate SSH host keys if they don't exist
 # Keys may already exist if /etc/dropbear is mounted from a PVC
 KEYS_GENERATED=0

@@ -82,13 +82,15 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Install global npm packages (happy-coder and claude-code)
 RUN npm install -g happy-coder @anthropic-ai/claude-code
 
-# Create workspace directory
-RUN mkdir -p /workspace
-
 # Create workspace user and group (non-privileged)
 RUN addgroup workspace && \
     adduser -D -s /bin/bash -G workspace workspace && \
-    chown workspace:workspace /workspace && \
+    chown workspace:workspace /workspace
+
+# Move home contents to template location before /home is PVC-mounted at runtime
+# entrypoint.sh will sync these contents to the PVC-mounted /home/workspace
+RUN mv /home/workspace /home/template && \
+    mkdir -p /home/workspace && \
     chown workspace:workspace /home/workspace && \
     chmod 750 /home/workspace
 
