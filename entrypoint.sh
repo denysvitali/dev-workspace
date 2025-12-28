@@ -61,6 +61,43 @@ if [ -d "$FRESH_HOME" ] && [ -n "$(ls -A "$FRESH_HOME" 2>/dev/null)" ]; then
     log "Home directory sync complete"
 fi
 
+# Always sync Nix profile from template to ensure Nix is available
+# The template's profile includes the nix package with etc/profile.d/nix.sh
+# This is needed because PVC-mounted profiles may not include Nix
+NIX_PROFILE_SRC="$FRESH_HOME/.local/state/nix/profiles"
+NIX_PROFILE_DST="$HOME/.local/state/nix/profiles"
+if [ -d "$NIX_PROFILE_SRC" ]; then
+    log "Syncing Nix profile from template to ensure Nix is available..."
+
+    # Create destination directory if it doesn't exist
+    mkdir -p "$NIX_PROFILE_DST"
+
+    # Sync all profile links from template
+    # We need to preserve existing user profiles but ensure at least one has Nix
+    rsync -a --ignore-existing "$NIX_PROFILE_SRC/" "$NIX_PROFILE_DST/" 2>/dev/null || true
+
+    # If the current profile doesn't have nix.sh, use the template's profile
+    if [ ! -f "$NIX_PROFILE_DST/profile/etc/profile.d/nix.sh" ]; then
+        TEMPLATE_PROFILE_LINK="$NIX_PROFILE_SRC/profile"
+        if [ -L "$TEMPLATE_PROFILE_LINK" ]; then
+            # Get what the template's profile points to
+            TEMPLATE_TARGET=$(readlink "$TEMPLATE_PROFILE_LINK")
+            if [ -e "$NIX_PROFILE_DST/$TEMPLATE_TARGET" ]; then
+                # Update the current profile symlink to point to the template's profile
+                ln -sf "$TEMPLATE_TARGET" "$NIX_PROFILE_DST/profile"
+                log "Updated profile to use template's Nix-enabled profile"
+            else
+                # Copy the template's profile link target if it doesn't exist in PVC
+                cp -a "$NIX_PROFILE_SRC/$TEMPLATE_TARGET" "$NIX_PROFILE_DST/"
+                ln -sf "$TEMPLATE_TARGET" "$NIX_PROFILE_DST/profile"
+                log "Copied template's Nix-enabled profile to PVC"
+            fi
+        fi
+    fi
+
+    log "Nix profile sync complete"
+fi
+
 # Initialize Nix store if /nix volume is empty or missing the profile
 # The Nix store was copied to /nix-template during the build
 NIX_PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/profile"
@@ -70,10 +107,9 @@ if [ ! -f "$NIX_PROFILE_PATH" ] && [ -d "/nix-template" ]; then
     log "Nix store initialized"
 fi
 
-# Fix Nix profile symlink to point to actual nix store location
-# During build, Nix created a profile in /nix/var/nix/profiles/per-user/$USER/profile
-# The symlink should point there for nix commands to work
-NIX_PROFILE_DIR="/nix/var/nix/profiles/per-user/$USER/profile"
+# Fix Nix profile symlink to point to the actual profile location
+# Nix stores profiles in ~/.local/state/nix/profiles/ (modern single-user mode)
+NIX_PROFILE_DIR="$HOME/.local/state/nix/profiles/profile"
 if [ -L "$HOME/.nix-profile" ] || [ ! -e "$HOME/.nix-profile" ]; then
     log "Fixing Nix profile symlink..."
     rm -f "$HOME/.nix-profile"
