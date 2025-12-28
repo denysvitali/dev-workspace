@@ -70,14 +70,15 @@ if [ ! -f "$NIX_PROFILE_PATH" ] && [ -d "/nix-template" ]; then
     log "Nix store initialized"
 fi
 
-# Fix Nix profile symlink (points to wrong path from build time)
-# During build, Nix created symlinks with /home/workspace, but home was moved to /home/template
-# The symlink needs to point to $HOME/.local/state/nix/profiles/profile instead
-if [ -L "$HOME/.nix-profile" ]; then
+# Fix Nix profile symlink to point to actual nix store location
+# During build, Nix created a profile in /nix/var/nix/profiles/per-user/$USER/profile
+# The symlink should point there for nix commands to work
+NIX_PROFILE_DIR="/nix/var/nix/profiles/per-user/$USER/profile"
+if [ -L "$HOME/.nix-profile" ] || [ ! -e "$HOME/.nix-profile" ]; then
     log "Fixing Nix profile symlink..."
-    rm "$HOME/.nix-profile"
-    ln -s "$HOME/.local/state/nix/profiles/profile" "$HOME/.nix-profile"
-    log "Nix profile symlink fixed"
+    rm -f "$HOME/.nix-profile"
+    ln -s "$NIX_PROFILE_DIR" "$HOME/.nix-profile"
+    log "Nix profile symlink fixed to $NIX_PROFILE_DIR"
 fi
 
 # Source Nix environment so nix/devenv commands are available
