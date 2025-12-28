@@ -185,6 +185,11 @@ RUN mkdir -p /home && \
     mkdir -p /home/workspace && \
     chown workspace:workspace /home/workspace && \
     chmod 750 /home/workspace
+
+# Copy Nix store to template location for PVC initialization at runtime
+# entrypoint.sh will sync this to the PVC-mounted /nix if the volume is empty
+RUN cp -a /nix /nix-template && \
+    chown -R workspace:workspace /nix-template
 USER workspace
 
 # Expose SSH (high port for non-root) and Mosh ports

@@ -38,9 +38,11 @@ See your Kubernetes deployment configuration for setup details.
 ssh -p 2222 workspace@<host>
 ```
 
-### Persistent Host Keys
+### Persistent Volumes
 
-To maintain persistent SSH host keys across container restarts, mount a volume at `/etc/dropbear`:
+To maintain persistent data across container restarts, mount volumes at the following paths:
+
+#### SSH Host Keys
 
 ```yaml
 volumes:
@@ -50,4 +52,18 @@ volumes:
 volumeMounts:
   - name: ssh-host-keys
     mountPath: /etc/dropbear
+```
+
+#### Nix Store (Required for Nix/Devenv)
+
+The Nix package manager requires a persistent volume to store packages and profiles. Without this, Nix and devenv will not be available:
+
+```yaml
+volumes:
+  - name: nix-store
+    persistentVolumeClaim:
+      claimName: workspace-nix-store
+volumeMounts:
+  - name: nix-store
+    mountPath: /nix
 ```

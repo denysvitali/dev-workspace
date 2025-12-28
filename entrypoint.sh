@@ -61,6 +61,31 @@ if [ -d "$FRESH_HOME" ] && [ -n "$(ls -A "$FRESH_HOME" 2>/dev/null)" ]; then
     log "Home directory sync complete"
 fi
 
+# Initialize Nix store if /nix volume is empty or missing the profile
+# The Nix store was copied to /nix-template during the build
+NIX_PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/profile"
+if [ ! -f "$NIX_PROFILE_PATH" ] && [ -d "/nix-template" ]; then
+    log "Initializing Nix store from template..."
+    cp -a /nix-template/. /nix/
+    log "Nix store initialized"
+fi
+
+# Fix Nix profile symlink (points to wrong path from build time)
+# During build, Nix created symlinks with /home/workspace, but home was moved to /home/template
+# The symlink needs to point to $HOME/.local/state/nix/profiles/profile instead
+if [ -L "$HOME/.nix-profile" ]; then
+    log "Fixing Nix profile symlink..."
+    rm "$HOME/.nix-profile"
+    ln -s "$HOME/.local/state/nix/profiles/profile" "$HOME/.nix-profile"
+    log "Nix profile symlink fixed"
+fi
+
+# Source Nix environment so nix/devenv commands are available
+if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+    log "Nix environment loaded"
+fi
+
 # Generate SSH host keys if they don't exist
 # Keys may already exist if /etc/dropbear is mounted from a PVC
 KEYS_GENERATED=0
