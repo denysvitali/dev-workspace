@@ -144,6 +144,11 @@ ENV PATH="/home/workspace/.nix-profile/bin:$PATH"
 RUN . ~/.nix-profile/etc/profile.d/nix.sh && \
     nix profile install nixpkgs#devenv
 
+# Install uv package manager (as workspace user)
+USER workspace
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+USER root
+
 # Setup shell configuration with useful aliases for workspace user
 RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \
     echo 'alias la="exa -la"' >> ~/.bashrc && \
