@@ -99,12 +99,18 @@ if [ -d "$NIX_PROFILE_SRC" ]; then
 fi
 
 # Initialize Nix store if /nix volume is empty or missing the profile
-# The Nix store was copied to /nix-template during the build
+# Try to copy from template first, then fall back to using the image's nix store
 NIX_PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/profile"
-if [ ! -f "$NIX_PROFILE_PATH" ] && [ -d "/nix-template" ]; then
-    log "Initializing Nix store from template..."
-    cp -a /nix-template/. /nix/
-    log "Nix store initialized"
+if [ ! -f "$NIX_PROFILE_PATH" ]; then
+    if [ -d "/nix-template" ]; then
+        log "Initializing Nix store from template..."
+        cp -a /nix-template/. /nix/
+        log "Nix store initialized from template"
+    elif [ -d "/nix/var/nix/profiles" ]; then
+        log "Using existing Nix store from image"
+    else
+        log "WARNING: Nix store not available - first run will install packages"
+    fi
 fi
 
 # Fix Nix profile symlink to point to the actual profile location

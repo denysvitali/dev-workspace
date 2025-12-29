@@ -29,9 +29,6 @@ RUN apk update && apk upgrade && apk add --no-cache \
     zsh \
     zsh-autosuggestions \
     zsh-syntax-highlighting \
-    build-base \
-    musl-dev \
-    linux-headers \
     tmux \
     ripgrep \
     fd \
@@ -62,7 +59,6 @@ RUN apk update && apk upgrade && apk add --no-cache \
     go \
     python3 \
     py3-pip \
-    python3-dev \
     nodejs \
     npm \
     yarn \
@@ -70,9 +66,7 @@ RUN apk update && apk upgrade && apk add --no-cache \
     tzdata \
     pnpm \
     github-cli \
-    libgudev-dev \
     gcompat \
-    libc6-compat \
     && rm -rf /var/cache/apk/*
 
 # Set timezone and locale
@@ -191,10 +185,9 @@ RUN mkdir -p /home && \
     chown workspace:workspace /home/workspace && \
     chmod 750 /home/workspace
 
-# Copy Nix store to template location for PVC initialization at runtime
-# entrypoint.sh will sync this to the PVC-mounted /nix if the volume is empty
-RUN cp -a /nix /nix-template && \
-    chown -R workspace:workspace /nix-template
+# NOTE: nix-template directory removed to reduce image size
+# The nix store will be initialized on first run via the PVC
+# This saves ~4GB+ of image size
 USER workspace
 
 # Expose SSH (high port for non-root) and Mosh ports
