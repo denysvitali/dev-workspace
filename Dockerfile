@@ -185,9 +185,11 @@ RUN mkdir -p /home && \
     chown workspace:workspace /home/workspace && \
     chmod 750 /home/workspace
 
-# NOTE: nix-template directory removed to reduce image size
-# The nix store will be initialized on first run via the PVC
-# This saves ~4GB+ of image size
+# Move Nix store to template location for PVC initialization at runtime
+# Using mv instead of cp saves ~4GB by storing nix only once
+USER root
+RUN mv /nix /nix-template && \
+    chown -R workspace:workspace /nix-template
 USER workspace
 
 # Expose SSH (high port for non-root) and Mosh ports
