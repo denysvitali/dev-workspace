@@ -57,6 +57,7 @@ jobs:
         context: .
         platforms: linux/amd64
         labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
@@ -69,6 +70,7 @@ jobs:
         echo "## AMD64 Image Size" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "\`$SIZE\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Generate Bill of Materials (BOM)
       id: bom
@@ -133,6 +135,7 @@ jobs:
         context: .
         platforms: linux/arm64
         labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
@@ -145,6 +148,7 @@ jobs:
         echo "## ARM64 Image Size" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "\`$SIZE\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Generate Bill of Materials (BOM)
       id: bom
