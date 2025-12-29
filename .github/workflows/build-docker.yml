@@ -59,7 +59,23 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+        provenance: false
+        outputs: type=docker,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},flatten=true
+
+    - name: Push squashed AMD64 image to registry
+      if: github.event_name != 'pull_request'
+      run: |
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Report AMD64 image size
+      if: github.event_name != 'pull_request'
+      run: |
+        SIZE=$(docker images --format "{{.Size}}" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} | head -1)
+        echo "## AMD64 Image Size" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "\`$SIZE\`" >> $GITHUB_STEP_SUMMARY
+        echo "AMD64 Image Size: $SIZE" >> $GITHUB_STEP_SUMMARY
 
     - name: Generate Bill of Materials (BOM)
       id: bom
@@ -126,7 +142,23 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+        provenance: false
+        outputs: type=docker,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},flatten=true
+
+    - name: Push squashed ARM64 image to registry
+      if: github.event_name != 'pull_request'
+      run: |
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Report ARM64 image size
+      if: github.event_name != 'pull_request'
+      run: |
+        SIZE=$(docker images --format "{{.Size}}" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} | head -1)
+        echo "## ARM64 Image Size" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "\`$SIZE\`" >> $GITHUB_STEP_SUMMARY
+        echo "ARM64 Image Size: $SIZE" >> $GITHUB_STEP_SUMMARY
 
     - name: Generate Bill of Materials (BOM)
       id: bom
