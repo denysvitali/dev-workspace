@@ -98,19 +98,15 @@ if [ -d "$NIX_PROFILE_SRC" ]; then
     log "Nix profile sync complete"
 fi
 
-# Initialize Nix store if /nix volume is empty or missing the profile
-# Try to copy from template first, then fall back to using the image's nix store
-NIX_PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/profile"
-if [ ! -f "$NIX_PROFILE_PATH" ]; then
-    if [ -d "/nix-template" ]; then
-        log "Initializing Nix store from template..."
-        cp -a /nix-template/. /nix/
-        log "Nix store initialized from template"
-    elif [ -d "/nix/var/nix/profiles" ]; then
-        log "Using existing Nix store from image"
-    else
-        log "WARNING: Nix store not available - first run will install packages"
-    fi
+# Initialize Nix store only if /nix is empty (first run on fresh PVC)
+if [ -z "$(ls -A /nix 2>/dev/null)" ]; then
+    log "Initializing Nix store (first run detected)..."
+    # The image already has Nix installed, just need to ensure the store is usable
+    # If /nix is empty but Nix is available in the image, this allows first channel setup
+    mkdir -p /nix/var/nix/profiles/per-user/"$USER"
+    log "Nix store initialized"
+else
+    log "Using existing Nix store from PVC"
 fi
 
 # Fix Nix profile symlink to point to the actual profile location
