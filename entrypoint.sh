@@ -189,25 +189,16 @@ fi
 # Initialize Claude Code if API key is provided
 if [ -n "$ANTHROPIC_API_KEY" ]; then
     log "Claude Code API key provided, setting up..."
-    export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
 fi
 
 log "Workspace container started successfully"
 log "Running as user: $(whoami)"
 log "Home directory: $HOME"
 
-# Start Happy daemon if ANTHROPIC_API_KEY is set
-if [ -n "$ANTHROPIC_API_KEY" ]; then
-    log "Starting Happy daemon..."
-    # Collect all ANTHROPIC_ and HAPPY_ environment variables
-    DAEMON_ENVS=""
-    for var in $(env | grep -E "^(ANTHROPIC_|HAPPY_)" | cut -d= -f1); do
-        DAEMON_ENVS="$DAEMON_ENVS $var=${!var}"
-    done
-    # Start daemon in background, suppress errors if it fails (e.g., not authenticated)
-    (env $DAEMON_ENVS happy daemon start 2>/dev/null || log "Happy daemon not started (may need authentication)") &
-else
-    log "ANTHROPIC_API_KEY not set, skipping Happy daemon"
+# Run user startup script if present
+if [ -f "$HOME/start.sh" ]; then
+    log "Running user startup script $HOME/start.sh..."
+    bash "$HOME/start.sh" || log "Warning: start.sh exited with error $?"
 fi
 
 log "Accepting connections via SSH on port 2222..."
