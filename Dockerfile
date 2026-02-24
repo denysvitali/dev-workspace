@@ -1,11 +1,6 @@
 FROM ubuntu:24.04
 
-# Enable universe repository for additional packages
-RUN apt-get update && apt-get install -y software-properties-common && \
-    add-apt-repository universe && \
-    apt-get update
-
-# Update and install system dependencies, core utilities, and development tools
+# Install system dependencies, core utilities, and development tools
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     wget \
@@ -52,31 +47,37 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     nmap \
     rsync \
     screen \
-    golang-go \
     python3 \
     python3-pip \
-    nodejs \
-    npm \
     tzdata \
     ripgrep \
     fd-find \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yq (YAML processor) - download pre-built binary
-RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.2/yq_linux_amd64 && \
-    chmod +x /usr/local/bin/yq
+# Install Go (latest stable) from official binaries
+ARG GO_VERSION=1.26.0
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz && \
+    rm -rf /usr/local/go && \
+    tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz && \
+    rm go${GO_VERSION}.linux-amd64.tar.gz
+ENV PATH=/usr/local/go/bin:$PATH
+ENV GOPATH=/home/workspace/go
 
-# Install NPM tools
-RUN npm install -g pnpm yarn
+# Install Node.js LTS (latest) from NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install GitHub CLI
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+# Install yq, kubectl, and GitHub CLI
+RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.52.4/yq_linux_amd64 && \
+    chmod +x /usr/local/bin/yq && \
+    curl -fsSL https://dl.k8s.io/release/v1.35.1/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl && \
+    chmod +x /usr/local/bin/kubectl && \
+    mkdir -p -m 755 /etc/apt/keyrings && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
     apt-get update && apt-get install -y --no-install-recommends gh && rm -rf /var/lib/apt/lists/*
-
-# Install kubectl
-RUN curl -fsSL https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl && \
-    chmod +x /usr/local/bin/kubectl
 
 # Set timezone and locale
 ENV TZ=UTC
@@ -89,8 +90,7 @@ RUN usermod -l workspace ubuntu && \
     usermod -d /home/workspace -m workspace && \
     mkdir -p /workspace && chown -R workspace:workspace /workspace
 
-# Install global npm packages (happy-coder)
-RUN npm install -g happy-coder
+# npm packages will be installed as workspace user
 
 USER workspace
 # Install Claude Code
@@ -138,7 +138,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 
 # Install uv package manager (as workspace user)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-USER root
+
+# Install global npm packages (pnpm, yarn, happy-coder)
+RUN npm install -g pnpm yarn happy-coder
 
 # Setup git configuration for workspace user
 RUN git config --global init.defaultBranch main && \
@@ -147,6 +149,8 @@ RUN git config --global init.defaultBranch main && \
     git config --global core.editor vim && \
     git config --global push.default simple && \
     git config --global pull.rebase false
+
+USER root
 
 # Create common directories for workspace user
 RUN mkdir -p /home/workspace/go/src /home/workspace/go/bin /home/workspace/go/pkg /home/workspace/.local/bin /home/workspace/.config
