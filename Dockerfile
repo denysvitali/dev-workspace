@@ -59,7 +59,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     python3-pip \
     nodejs \
     npm \
-    yarn \
     tzdata \
     ripgrep \
     fd-find \
@@ -69,8 +68,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.2/yq_linux_amd64 && \
     chmod +x /usr/local/bin/yq
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install NPM tools
+RUN npm install -g pnpm yarn
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
