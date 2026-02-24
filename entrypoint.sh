@@ -61,68 +61,52 @@ if [ -d "$FRESH_HOME" ] && [ -n "$(ls -A "$FRESH_HOME" 2>/dev/null)" ]; then
     log "Home directory sync complete"
 fi
 
-# Always sync Nix profile from template to ensure Nix is available
-# The template's profile includes the nix package with etc/profile.d/nix.sh
-# This is needed because PVC-mounted profiles may not include Nix
-NIX_PROFILE_SRC="$FRESH_HOME/.local/state/nix/profiles"
-NIX_PROFILE_DST="$HOME/.local/state/nix/profiles"
-if [ -d "$NIX_PROFILE_SRC" ]; then
-    log "Syncing Nix profile from template to ensure Nix is available..."
-
-    # Create destination directory if it doesn't exist
-    mkdir -p "$NIX_PROFILE_DST"
-
-    # Sync all profile links from template
-    # We need to preserve existing user profiles but ensure at least one has Nix
-    rsync -a --ignore-existing "$NIX_PROFILE_SRC/" "$NIX_PROFILE_DST/" 2>/dev/null || true
-
-    # If the current profile doesn't have nix.sh, use the template's profile
-    if [ ! -f "$NIX_PROFILE_DST/profile/etc/profile.d/nix.sh" ]; then
-        TEMPLATE_PROFILE_LINK="$NIX_PROFILE_SRC/profile"
-        if [ -L "$TEMPLATE_PROFILE_LINK" ]; then
-            # Get what the template's profile points to
-            TEMPLATE_TARGET=$(readlink "$TEMPLATE_PROFILE_LINK")
-            if [ -e "$NIX_PROFILE_DST/$TEMPLATE_TARGET" ]; then
-                # Update the current profile symlink to point to the template's profile
-                ln -sf "$TEMPLATE_TARGET" "$NIX_PROFILE_DST/profile"
-                log "Updated profile to use template's Nix-enabled profile"
-            else
-                # Copy the template's profile link target if it doesn't exist in PVC
-                cp -a "$NIX_PROFILE_SRC/$TEMPLATE_TARGET" "$NIX_PROFILE_DST/"
-                ln -sf "$TEMPLATE_TARGET" "$NIX_PROFILE_DST/profile"
-                log "Copied template's Nix-enabled profile to PVC"
-            fi
-        fi
-    fi
-
-    log "Nix profile sync complete"
-fi
-
-# Initialize Nix store only if /nix is empty (first run on fresh PVC)
-if [ -z "$(ls -A /nix 2>/dev/null)" ]; then
-    log "Initializing Nix store (first run detected)..."
-    # The image already has Nix installed, just need to ensure the store is usable
-    # If /nix is empty but Nix is available in the image, this allows first channel setup
-    mkdir -p /nix/var/nix/profiles/per-user/"$USER"
-    log "Nix store initialized"
-else
-    log "Using existing Nix store from PVC"
-fi
-
-# Fix Nix profile symlink to point to the actual profile location
-# Nix stores profiles in ~/.local/state/nix/profiles/ (modern single-user mode)
+# Setup Nix - install if not present (first run), otherwise use existing from PVC
 NIX_PROFILE_DIR="$HOME/.local/state/nix/profiles/profile"
-if [ -L "$HOME/.nix-profile" ] || [ ! -e "$HOME/.nix-profile" ]; then
-    log "Fixing Nix profile symlink..."
-    rm -f "$HOME/.nix-profile"
-    ln -s "$NIX_PROFILE_DIR" "$HOME/.nix-profile"
-    log "Nix profile symlink fixed to $NIX_PROFILE_DIR"
+NIX_INITIALIZED=0
+
+if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+    log "Nix already installed, loading environment..."
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+    log "Nix environment loaded from existing installation"
+else
+    log "Installing Nix package manager (first run detected)..."
+
+    # Create nix directory and set ownership
+    mkdir -p /nix
+    chown workspace:workspace /nix
+
+    # Install Nix (single-user mode, no daemon)
+    su - "$USER" -c "curl -L https://nixos.org/nix/install | sh -s -- --no-daemon" || error_exit "Nix installation failed"
+
+    # Configure Nix with flakes
+    mkdir -p "$HOME/.config/nix"
+    echo "experimental-features = nix-command flakes" >> "$HOME/.config/nix/nix.conf"
+
+    # Add Nix to shell configs
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> "$HOME/.bashrc"
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> "$HOME/.profile"
+
+    # Source Nix
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+
+    # Install devenv via nix
+    log "Installing devenv via Nix..."
+    nix profile install nixpkgs#devenv || error_exit "Failed to install devenv"
+
+    NIX_INITIALIZED=1
+    log "Nix and devenv installed successfully"
 fi
 
-# Source Nix environment so nix/devenv commands are available
+# Ensure .nix-profile symlink exists (may not persist across restarts)
+if [ ! -L "$HOME/.nix-profile" ]; then
+    mkdir -p "$HOME/.local/state/nix/profiles"
+    ln -s "$NIX_PROFILE_DIR" "$HOME/.nix-profile"
+fi
+
+# Source Nix environment if available
 if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-    log "Nix environment loaded"
 fi
 
 # Generate SSH host keys if they don't exist

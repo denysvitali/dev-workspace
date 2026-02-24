@@ -61,7 +61,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
-        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},name-canonical=true,push=${{ github.event_name != 'pull_request' }},flatten=true
+        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},name-canonical=true,push=${{ github.event_name != 'pull_request' }},flatten=true,squash=true
 
     - name: Report AMD64 image size
       if: github.event_name != 'pull_request'
@@ -139,7 +139,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         provenance: false
-        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},name-canonical=true,push=${{ github.event_name != 'pull_request' }},flatten=true
+        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},name-canonical=true,push=${{ github.event_name != 'pull_request' }},flatten=true,squash=true
 
     - name: Report ARM64 image size
       if: github.event_name != 'pull_request'

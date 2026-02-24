@@ -138,34 +138,10 @@ USER workspace
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
     . /home/workspace/.cargo/env && \
     rustup component add rustfmt clippy
-USER root
-
-# Install Nix package manager (single-user installation for non-root operation)
-RUN mkdir -p /nix && chown workspace:workspace /nix
-
-# Install Nix as workspace user (single-user mode - no daemon required)
-USER workspace
-RUN curl -L https://nixos.org/nix/install | sh -s -- --no-daemon && \
-    # Configure Nix with flakes enabled
-    mkdir -p ~/.config/nix && \
-    echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
-
-# Add Nix to PATH for workspace user
-ENV PATH="/home/workspace/.nix-profile/bin:$PATH"
-
-# Install devenv via nix profile
-RUN . ~/.nix-profile/etc/profile.d/nix.sh && \
-    nix profile install nixpkgs#devenv
 
 # Install uv package manager (as workspace user)
-USER workspace
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 USER root
-
-# Setup shell configuration for workspace user
-RUN echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> /home/workspace/.bashrc && \
-    # Also add to .profile for login shells (SSH) \
-    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> /home/workspace/.profile
 
 # Setup git configuration for workspace user
 RUN git config --global init.defaultBranch main && \
@@ -186,13 +162,6 @@ RUN mkdir -p /home && \
     mkdir -p /home/workspace && \
     chown workspace:workspace /home/workspace && \
     chmod 750 /home/workspace
-
-# Move Nix store to template location for PVC initialization at runtime
-# Using mv instead of cp saves ~4GB by storing nix only once
-USER root
-RUN mv /nix /nix-template && \
-    chown -R workspace:workspace /nix-template
-USER workspace
 
 # Expose SSH (high port for non-root) and Mosh ports
 EXPOSE 2222
