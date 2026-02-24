@@ -139,6 +139,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 # Install uv package manager (as workspace user)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
+# Configure npm to use user-local directory for global packages
+ENV npm_config_prefix=/home/workspace/.local
+
 # Install global npm packages (pnpm, yarn, happy-coder)
 RUN npm install -g pnpm yarn happy-coder
 
