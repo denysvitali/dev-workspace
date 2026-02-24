@@ -10,7 +10,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     curl \
     wget \
     git \
-    git-doc \
     dropbear \
     mosh \
     openssh-client \
@@ -18,7 +17,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     vim \
     nano \
     htop \
-    btop \
     net-tools \
     iputils-ping \
     bind9-dnsutils \
