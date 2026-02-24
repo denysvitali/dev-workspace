@@ -1,13 +1,17 @@
-FROM alpine:latest
+FROM ubuntu:24.04
+
+# Enable universe repository for additional packages
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository universe && \
+    apt-get update
 
 # Update and install system dependencies, core utilities, and development tools
-RUN apk update && apk upgrade && apk add --no-cache \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
     git-doc \
     dropbear \
-    dropbear-dbclient \
     mosh \
     openssh-client \
     sudo \
@@ -16,10 +20,9 @@ RUN apk update && apk upgrade && apk add --no-cache \
     htop \
     btop \
     net-tools \
-    iputils \
-    bind-tools \
+    iputils-ping \
+    bind9-dnsutils \
     jq \
-    yq \
     unzip \
     zip \
     ca-certificates \
@@ -27,14 +30,10 @@ RUN apk update && apk upgrade && apk add --no-cache \
     bash \
     bash-completion \
     zsh \
-    zsh-autosuggestions \
-    zsh-syntax-highlighting \
     tmux \
-    ripgrep \
-    fd \
     fzf \
     bat \
-    exa \
+    eza \
     tree \
     less \
     findutils \
@@ -42,10 +41,9 @@ RUN apk update && apk upgrade && apk add --no-cache \
     sed \
     tar \
     gzip \
-    xz \
+    xz-utils \
     bzip2 \
     procps \
-    shadow \
     util-linux \
     coreutils \
     diffutils \
@@ -56,32 +54,53 @@ RUN apk update && apk upgrade && apk add --no-cache \
     nmap \
     rsync \
     screen \
-    go \
+    golang-go \
     python3 \
-    py3-pip \
+    python3-pip \
     nodejs \
     npm \
     yarn \
-    kubectl \
     tzdata \
-    pnpm \
-    github-cli \
-    gcompat \
-    && rm -rf /var/cache/apk/*
+    ripgrep \
+    fd-find \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install yq (YAML processor) - download pre-built binary
+RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.2/yq_linux_amd64 && \
+    chmod +x /usr/local/bin/yq
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Install GitHub CLI
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get update && apt-get install -y --no-install-recommends gh && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl
+RUN curl -fsSL https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl && \
+    chmod +x /usr/local/bin/kubectl
 
 # Set timezone and locale
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Install global npm packages (happy-coder and claude-code)
-RUN npm install -g happy-coder @anthropic-ai/claude-code
-
 # Create workspace user and group (non-privileged)
-# Manually create group and user to avoid busybox useradd issues
-RUN echo "workspace:x:1000:" >> /etc/group
-RUN echo "workspace:x:1000:1000:workspace:/home/workspace:/bin/bash" >> /etc/passwd
-RUN mkdir -p /home/workspace && chown workspace:workspace /home/workspace
-RUN mkdir -p /workspace && ls -la /workspace && chown -R workspace:workspace /workspace
+# Ubuntu 24.04 has 'ubuntu' user with UID 1000 - rename it to 'workspace'
+RUN usermod -l workspace ubuntu && \
+    groupmod -n workspace ubuntu && \
+    usermod -d /home/workspace -m workspace && \
+    mkdir -p /workspace && chown -R workspace:workspace /workspace
+
+# Install global npm packages (happy-coder)
+RUN npm install -g happy-coder
+
+USER workspace
+# Install Claude Code
+RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN /home/workspace/.local/bin/claude --version && /home/workspace/.local/bin/claude --ripgrep --version
+
+USER root
 
 # Setup dropbear SSH
 # Create directory for host keys (will be generated at runtime or mounted as volume)
@@ -143,27 +162,10 @@ USER workspace
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 USER root
 
-# Setup shell configuration with useful aliases for workspace user
-RUN echo 'alias ll="exa -la"' >> ~/.bashrc && \
-    echo 'alias la="exa -la"' >> ~/.bashrc && \
-    echo 'alias lt="exa --tree"' >> ~/.bashrc && \
-    echo 'alias cat="bat"' >> ~/.bashrc && \
-    echo 'alias find="fd"' >> ~/.bashrc && \
-    echo 'alias grep="rg"' >> ~/.bashrc && \
-    echo 'alias top="btop"' >> ~/.bashrc && \
-    echo 'alias ..="cd .."' >> ~/.bashrc && \
-    echo 'alias ...="cd ../.."' >> ~/.bashrc && \
-    echo 'alias gs="git status"' >> ~/.bashrc && \
-    echo 'alias gl="git log --oneline"' >> ~/.bashrc && \
-    echo 'alias gd="git diff"' >> ~/.bashrc && \
-    echo 'alias gb="git branch"' >> ~/.bashrc && \
-    echo 'export FZF_DEFAULT_COMMAND="fd --type f"' >> ~/.bashrc && \
-    echo 'export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"' >> ~/.bashrc && \
-    echo 'source /usr/share/bash-completion/bash_completion' >> ~/.bashrc && \
-    # Source Nix environment in bashrc \
-    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> ~/.bashrc && \
+# Setup shell configuration for workspace user
+RUN echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> /home/workspace/.bashrc && \
     # Also add to .profile for login shells (SSH) \
-    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> ~/.profile
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> /home/workspace/.profile
 
 # Setup git configuration for workspace user
 RUN git config --global init.defaultBranch main && \
@@ -174,7 +176,7 @@ RUN git config --global init.defaultBranch main && \
     git config --global pull.rebase false
 
 # Create common directories for workspace user
-RUN mkdir -p ~/go/src ~/go/bin ~/go/pkg ~/.local/bin ~/.config
+RUN mkdir -p /home/workspace/go/src /home/workspace/go/bin /home/workspace/go/pkg /home/workspace/.local/bin /home/workspace/.config
 
 # Move home contents to template location before /home is PVC-mounted at runtime
 # entrypoint.sh will sync these contents to the PVC-mounted /home/workspace
