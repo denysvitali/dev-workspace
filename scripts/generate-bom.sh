@@ -26,9 +26,7 @@ echo "| Tool | Version |"
 echo "|------|---------|"
 NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr")
 CLAUDE_VERSION=$(get_version $NPM_PREFIX/bin/claude --version 2>/dev/null || echo "N/A")
-HAPPY_VERSION=$(npm list -g happy-coder 2>/dev/null | grep happy-coder | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "N/A")
 echo "| Claude Code | ${CLAUDE_VERSION} |"
-echo "| Happy Coder | ${HAPPY_VERSION} |"
 echo "| Node.js | $(get_version node --version) |"
 echo "| npm | $(get_version npm --version) |"
 echo "| Python | $(python3 --version 2>/dev/null | cut -d' ' -f2 || echo N/A) |"
@@ -42,6 +40,6 @@ echo "| devenv | $(get_version /home/workspace/.nix-profile/bin/devenv version 2
 echo ""
 echo "## System Packages"
 echo "\`\`\`"
-apk list --installed 2>/dev/null | head -50 || echo "Unable to list packages"
+dpkg-query -W -f='${Package} ${Version}\n' 2>/dev/null | head -50 || echo "Unable to list packages"
 echo "... (truncated)"
 echo "\`\`\`"

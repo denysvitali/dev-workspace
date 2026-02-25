@@ -56,12 +56,16 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 
 # Install Go (latest stable) from official binaries
 ARG GO_VERSION=1.26.0
-RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz && \
+ARG TARGETARCH
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz && \
     rm -rf /usr/local/go && \
-    tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz && \
-    rm go${GO_VERSION}.linux-amd64.tar.gz
+    tar -C /usr/local -xzf go${GO_VERSION}.linux-${TARGETARCH}.tar.gz && \
+    rm go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
 ENV PATH=/usr/local/go/bin:$PATH
 ENV GOPATH=/home/workspace/go
+# Ensure Go is in PATH for all login shells (e.g. SSH via dropbear)
+RUN echo 'export PATH=/usr/local/go/bin:$HOME/go/bin:$PATH' > /etc/profile.d/golang.sh && \
+    echo 'export GOPATH=$HOME/go' >> /etc/profile.d/golang.sh
 
 # Install Node.js LTS (latest) from NodeSource
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
@@ -142,8 +146,8 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 # Configure npm to use user-local directory for global packages
 ENV npm_config_prefix=/home/workspace/.local
 
-# Install global npm packages (pnpm, yarn, happy-coder)
-RUN npm install -g pnpm yarn happy-coder
+# Install global npm packages (pnpm, yarn)
+RUN npm install -g pnpm yarn
 
 # Setup git configuration for workspace user
 RUN git config --global init.defaultBranch main && \
@@ -181,5 +185,4 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
         echo "All services healthy" \
     '
 
-# Already running as workspace user from Nix installation
 ENTRYPOINT ["/entrypoint.sh"]

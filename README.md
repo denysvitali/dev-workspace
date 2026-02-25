@@ -10,7 +10,7 @@ A containerized development workspace with SSH access and essential development 
 - Multiple language support (Rust, Go, Python, Node.js)
 - Nix package manager (single-user mode) with devenv
 - Claude Code integration
-- Modern CLI tools (ripgrep, fd, fzf, bat, exa, btop)
+- Modern CLI tools (ripgrep, fd, fzf, bat, eza)
 - Runs as non-root user (`workspace`) - no root privileges required
 
 ## Networking
