@@ -52,6 +52,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     tzdata \
     ripgrep \
     fd-find \
+    gcc \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go (latest stable) from official binaries
