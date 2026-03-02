@@ -50,6 +50,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     python3 \
     python3-pip \
     tzdata \
+    locales \
     ripgrep \
     fd-find \
     gcc \
@@ -88,6 +89,10 @@ RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download
 # Set timezone and locale
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN locale-gen en_US.UTF-8 && update-locale LANG=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+RUN printf 'export LANG=en_US.UTF-8\nexport LC_ALL=en_US.UTF-8\n' > /etc/profile.d/locale.sh
 
 # Create workspace user and group (non-privileged)
 # Ubuntu 24.04 has 'ubuntu' user with UID 1000 - rename it to 'workspace'
