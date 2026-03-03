@@ -103,13 +103,6 @@ RUN usermod -l workspace ubuntu && \
 
 # npm packages will be installed as workspace user
 
-USER workspace
-# Install Claude Code
-RUN curl -fsSL https://claude.ai/install.sh | bash
-RUN /home/workspace/.local/bin/claude --version && /home/workspace/.local/bin/claude --ripgrep --version
-
-USER root
-
 # Setup dropbear SSH
 # Create directory for host keys (will be generated at runtime or mounted as volume)
 RUN mkdir -p /etc/dropbear && \

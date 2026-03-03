@@ -170,11 +170,6 @@ if [ -n "$WORKSPACE_NAME" ]; then
     log "Workspace name: $WORKSPACE_NAME"
 fi
 
-# Initialize Claude Code if API key is provided
-if [ -n "$ANTHROPIC_API_KEY" ]; then
-    log "Claude Code API key provided, setting up..."
-fi
-
 log "Workspace container started successfully"
 log "Running as user: $(whoami)"
 log "Home directory: $HOME"

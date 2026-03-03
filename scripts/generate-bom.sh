@@ -24,9 +24,6 @@ echo ""
 echo "## Development Tools"
 echo "| Tool | Version |"
 echo "|------|---------|"
-NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr")
-CLAUDE_VERSION=$(get_version $NPM_PREFIX/bin/claude --version 2>/dev/null || echo "N/A")
-echo "| Claude Code | ${CLAUDE_VERSION} |"
 echo "| Node.js | $(get_version node --version) |"
 echo "| npm | $(get_version npm --version) |"
 echo "| Python | $(python3 --version 2>/dev/null | cut -d' ' -f2 || echo N/A) |"
