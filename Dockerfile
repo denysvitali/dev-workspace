@@ -134,6 +134,10 @@ ENV PAGER=less
 ENV RUSTUP_HOME="/home/workspace/.rustup"
 ENV CARGO_HOME="/home/workspace/.cargo"
 
+# Pre-create nix directory in image layer (not on PVC)
+# This avoids runtime chown issues with PVC storage
+RUN mkdir -p /nix && chown workspace:workspace /nix
+
 # Install Rust via rustup for workspace user
 USER workspace
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
