@@ -77,8 +77,12 @@ else
     chown workspace:workspace /nix
 
     # Install Nix (single-user mode, no daemon)
-    RUN_AS_USER="${USER:-$(id -un)}"
-    su - "$RUN_AS_USER" -c "curl -L https://nixos.org/nix/install | sh -s -- --no-daemon" || error_exit "Nix installation failed"
+    RUN_AS_USER="${USER:-workspace}"
+    if [ "$(id -un)" = "$RUN_AS_USER" ]; then
+        curl -L https://nixos.org/nix/install | sh -s -- --no-daemon || error_exit "Nix installation failed"
+    else
+        su - "$RUN_AS_USER" -c "curl -L https://nixos.org/nix/install | sh -s -- --no-daemon" || error_exit "Nix installation failed"
+    fi
 
     # Configure Nix with flakes
     mkdir -p "$HOME/.config/nix"
