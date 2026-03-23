@@ -61,7 +61,7 @@ if [ -d "$FRESH_HOME" ] && [ -n "$(ls -A "$FRESH_HOME" 2>/dev/null)" ]; then
     log "Home directory sync complete"
 fi
 
-# Setup Nix - install if not present (first run), otherwise use existing from PVC
+# Setup Nix - sync from pre-built template if not present, otherwise use existing from PVC
 NIX_PROFILE_DIR="$HOME/.local/state/nix/profiles/profile"
 NIX_INITIALIZED=0
 
@@ -69,14 +69,25 @@ if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
     log "Nix already installed, loading environment..."
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
     log "Nix environment loaded from existing installation"
+elif [ -d "/nix-template/store" ]; then
+    log "Syncing pre-built Nix store from image template (first run)..."
+
+    # Sync the pre-built /nix store from the image to the PVC
+    rsync -a /nix-template/ /nix/ || cp -a /nix-template/. /nix/
+
+    # Add Nix to shell configs
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> "$HOME/.bashrc"
+    echo '. ~/.nix-profile/etc/profile.d/nix.sh' >> "$HOME/.profile"
+
+    # Source Nix
+    . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+
+    NIX_INITIALIZED=1
+    log "Nix and devenv synced from image template"
 else
-    log "Installing Nix package manager (first run detected)..."
+    log "Installing Nix package manager from network (no template found)..."
 
-    # Create nix directory and set ownership
-    mkdir -p /nix
-    chown workspace:workspace /nix
-
-    # Install Nix (single-user mode, no daemon)
+    # Fallback: download and install Nix from network
     RUN_AS_USER="${USER:-workspace}"
     if [ "$(id -un)" = "$RUN_AS_USER" ]; then
         curl -L https://nixos.org/nix/install | sh -s -- --no-daemon || error_exit "Nix installation failed"
@@ -100,7 +111,7 @@ else
     nix profile install nixpkgs#devenv || error_exit "Failed to install devenv"
 
     NIX_INITIALIZED=1
-    log "Nix and devenv installed successfully"
+    log "Nix and devenv installed from network"
 fi
 
 # Ensure .nix-profile symlink exists (may not persist across restarts)

@@ -138,6 +138,16 @@ ENV CARGO_HOME="/home/workspace/.cargo"
 # This avoids runtime chown issues with PVC storage
 RUN mkdir -p /nix && chown workspace:workspace /nix
 
+# Install Nix + devenv at build time to avoid slow runtime downloads
+# The /nix store will be moved to /nix-template and synced to PVC at first boot
+USER workspace
+RUN curl -L https://nixos.org/nix/install | sh -s -- --no-daemon && \
+    . /home/workspace/.nix-profile/etc/profile.d/nix.sh && \
+    mkdir -p /home/workspace/.config/nix && \
+    echo "experimental-features = nix-command flakes" >> /home/workspace/.config/nix/nix.conf && \
+    nix profile install nixpkgs#devenv
+USER root
+
 # Install Rust via rustup for workspace user
 USER workspace
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
@@ -174,6 +184,12 @@ RUN mkdir -p /home && \
     mkdir -p /home/workspace && \
     chown workspace:workspace /home/workspace && \
     chmod 750 /home/workspace
+
+# Move pre-built Nix store to template location before /nix is PVC-mounted at runtime
+# entrypoint.sh will sync these contents to the PVC-mounted /nix on first boot
+RUN mv /nix /nix-template && \
+    mkdir -p /nix && \
+    chown workspace:workspace /nix
 
 # Expose SSH (high port for non-root) and Mosh ports
 EXPOSE 2222
