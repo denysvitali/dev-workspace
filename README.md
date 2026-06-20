@@ -8,7 +8,7 @@ A containerized development workspace with SSH access and essential development 
 - Mosh support for mobile/unstable connections
 - Pre-installed development tools (Git, Docker clients, kubectl, etc.)
 - Multiple language support (Rust, Go, Python, Node.js)
-- [Mise](https://mise.jdx.dev/) polyglot tool manager (replaces Nix/devenv)
+- [Mise](https://mise.jdx.dev/) polyglot tool manager
 - Claude Code integration
 - Modern CLI tools (ripgrep, fd, fzf, bat, eza)
 - Runs as non-root user (`workspace`) - no root privileges required

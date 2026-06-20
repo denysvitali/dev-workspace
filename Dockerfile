@@ -134,7 +134,7 @@ ENV PAGER=less
 ENV RUSTUP_HOME="/home/workspace/.rustup"
 ENV CARGO_HOME="/home/workspace/.cargo"
 
-# Install Mise (polyglot tool manager — replaces Nix/devenv) at build time
+# Install Mise (polyglot tool manager) at build time
 # Mise data lives under $HOME, so it rides along with the /home template below
 USER workspace
 RUN curl https://mise.run | sh

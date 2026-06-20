@@ -61,7 +61,7 @@ if [ -d "$FRESH_HOME" ] && [ -n "$(ls -A "$FRESH_HOME" 2>/dev/null)" ]; then
     log "Home directory sync complete"
 fi
 
-# Setup Mise (polyglot tool manager — replaces Nix/devenv)
+# Setup Mise (polyglot tool manager)
 MISE_BIN="$HOME/.local/bin/mise"
 MISE_CONFIG_DIR="$HOME/.config/mise"
 
