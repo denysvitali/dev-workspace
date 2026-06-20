@@ -8,7 +8,7 @@ A containerized development workspace with SSH access and essential development 
 - Mosh support for mobile/unstable connections
 - Pre-installed development tools (Git, Docker clients, kubectl, etc.)
 - Multiple language support (Rust, Go, Python, Node.js)
-- Nix package manager (single-user mode) with devenv
+- [Mise](https://mise.jdx.dev/) polyglot tool manager (replaces Nix/devenv)
 - Claude Code integration
 - Modern CLI tools (ripgrep, fd, fzf, bat, eza)
 - Runs as non-root user (`workspace`) - no root privileges required
@@ -22,6 +22,10 @@ A containerized development workspace with SSH access and essential development 
 - `SSH_PUBLIC_KEY`: Your SSH public key for authentication
 - `WORKSPACE_NAME`: Optional hostname for the workspace
 - `ANTHROPIC_API_KEY`: Optional API key for Claude Code integration
+- `MISE_GITHUB_TOKEN`: Optional GitHub PAT for Mise to avoid API rate limits when
+  installing tools from GitHub releases. Falls back to `GITHUB_API_TOKEN` /
+  `GITHUB_TOKEN` if unset. Persisted to `~/.config/mise/github_tokens.toml` on
+  first boot (chmod 600).
 
 ## Ports
 
@@ -54,16 +58,37 @@ volumeMounts:
     mountPath: /etc/dropbear
 ```
 
-#### Nix Store (Required for Nix/Devenv)
+#### Mise Data (Recommended)
 
-The Nix package manager requires a persistent volume to store packages and profiles. Without this, Nix and devenv will not be available:
+Mise stores installed tools under `~/.local/share/mise` and config under
+`~/.config/mise`. To survive container restarts, mount `/home/workspace` (or at
+least those subpaths) as a persistent volume:
 
 ```yaml
 volumes:
-  - name: nix-store
+  - name: workspace-home
     persistentVolumeClaim:
-      claimName: workspace-nix-store
+      claimName: workspace-home
 volumeMounts:
-  - name: nix-store
-    mountPath: /nix
+  - name: workspace-home
+    mountPath: /home/workspace
+```
+
+### Mise Usage
+
+Define per-project tool versions with a `mise.toml` (or `.tool-versions`) in
+your project root:
+
+```toml
+[tools]
+node = "22"
+python = "3.12"
+go = "1.23"
+```
+
+Then inside the workspace:
+
+```bash
+mise install        # install declared versions
+mise use node@22    # pin a tool for the current dir
 ```
