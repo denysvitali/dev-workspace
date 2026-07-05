@@ -157,8 +157,12 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 # Configure npm to use user-local directory for global packages
 ENV npm_config_prefix=/home/workspace/.local
 
-# Install global npm packages (pnpm, yarn)
-RUN npm install -g pnpm yarn
+# Install global npm packages and agent CLIs.
+ARG CODEX_NPM_PACKAGE=@openai/codex@0.142.5
+ARG CLAUDE_CODE_NPM_PACKAGE=@anthropic-ai/claude-code@2.1.201
+RUN npm install -g pnpm yarn "$CODEX_NPM_PACKAGE" "$CLAUDE_CODE_NPM_PACKAGE" && \
+    command -v codex && codex --version && \
+    command -v claude && claude --version
 
 # Setup git configuration for workspace user
 RUN git config --global init.defaultBranch main && \

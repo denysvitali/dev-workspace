@@ -9,7 +9,7 @@ A containerized development workspace with SSH access and essential development 
 - Pre-installed development tools (Git, Docker clients, kubectl, etc.)
 - Multiple language support (Rust, Go, Python, Node.js)
 - [Mise](https://mise.jdx.dev/) polyglot tool manager
-- Claude Code integration
+- Codex and Claude Code integration
 - Modern CLI tools (ripgrep, fd, fzf, bat, eza)
 - Runs as non-root user (`workspace`) - no root privileges required
 
@@ -21,6 +21,7 @@ A containerized development workspace with SSH access and essential development 
 
 - `SSH_PUBLIC_KEY`: Your SSH public key for authentication
 - `WORKSPACE_NAME`: Optional hostname for the workspace
+- `OPENAI_API_KEY`: Optional API key for Codex CLI integration
 - `ANTHROPIC_API_KEY`: Optional API key for Claude Code integration
 - `MISE_GITHUB_TOKEN`: Optional GitHub PAT for Mise to avoid API rate limits when
   installing tools from GitHub releases. Falls back to `GITHUB_API_TOKEN` /
