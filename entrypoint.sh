@@ -90,7 +90,7 @@ EOF
 
     # Ensure mise activates in interactive login shells (SSH via dropbear)
     for rc in "$HOME/.bashrc" "$HOME/.profile"; do
-        if [ -f "$rc" ] && ! grep -q 'mise activate' "$rc"; then
+        if [ -f "$rc" ] && ! grep -q 'mise.*activate' "$rc"; then
             echo 'eval "$("$HOME/.local/bin/mise" activate bash)"' >> "$rc"
         fi
     done
