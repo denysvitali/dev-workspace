@@ -93,3 +93,42 @@ Then inside the workspace:
 mise install        # install declared versions
 mise use node@22    # pin a tool for the current dir
 ```
+
+### Agent guidance and progress
+
+Install the workspace commit guard for all primary checkouts:
+
+```bash
+python3 scripts/install_agent_guardrails.py /home/workspace/git --future
+python3 scripts/check_agent_guidance.py --all /home/workspace/git
+python3 -m unittest discover -s scripts -p 'test_agent_guardrails.py' -v
+```
+
+The guard limits each `AGENTS.md`, `AGENTS.override.md`, and `CLAUDE.md` to
+24 KiB and each inherited instruction chain to 28 KiB. The latter leaves
+room below Codex's 32 KiB project instruction limit. It follows symlinks,
+uses override precedence, and checks staged blobs at commit time. Move
+implementation details to linked references instead of increasing the limit.
+
+Installation preserves the existing hook directory and delegates its hooks.
+`--future` preserves the current Git template and adds the guard for new clones
+and initializations (repositories with their own `core.hooksPath` still need
+the installer).
+Rerun the installer after adding checkouts or changing another hook manager.
+It does not switch branches, create worktrees, or edit repository source.
+Git hooks are local enforcement; `--no-verify` bypasses them. CI in this
+repository tests the shared tooling; other repositories can run the checker
+in their CI for enforcement outside this workspace.
+
+`scripts/agent_checkpoint.py` supports Codex `SessionStart`, `PreCompact`,
+`PostToolUse`, `Stop`, and `UserPromptSubmit` command hooks. Configure the
+reviewed script in `~/.codex/hooks.json`, then trust each exact hook hash
+through Codex's hook review. SessionStart injects only that session's saved
+goal, recent user constraints, progress, and optional `.notes.md` task state.
+Checkpoints live in `~/.codex/workspace-progress/` with private permissions;
+transcripts are read incrementally and hidden reasoning and raw tool results
+are excluded. Add a short durable note before milestones or long waits with
+verified work, remaining steps, relevant files, commit/run identifiers, and
+active process identifiers. Hooks preserve evidence, but cannot guarantee
+that a model remembers every detail; the notes and Happy ToDo list remain
+the explicit task record. Recovery is bounded to 10,000 characters.

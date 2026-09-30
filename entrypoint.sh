@@ -164,6 +164,12 @@ log "Running as user: $(whoami)"
 log "Home directory: $HOME"
 
 # Run user startup script if present
+AGENT_GUARD_INSTALLER="$HOME/git/dev-workspace/scripts/install_agent_guardrails.py"
+if [ -f "$AGENT_GUARD_INSTALLER" ] && [ -d "$HOME/git" ]; then
+    log "Installing agent guidance checks in primary repositories..."
+    python3 "$AGENT_GUARD_INSTALLER" "$HOME/git" --future || log "Warning: agent guidance guard installation failed"
+fi
+
 if [ -f "$HOME/start.sh" ]; then
     log "Running user startup script $HOME/start.sh..."
     bash "$HOME/start.sh" || log "Warning: start.sh exited with error $?"
