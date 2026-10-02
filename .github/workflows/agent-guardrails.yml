@@ -13,4 +13,4 @@ jobs:
       - name: Check agent guidance and checkpoint regressions
         run: |
           python3 scripts/check_agent_guidance.py
-          python3 -m unittest discover -s scripts -p 'test_agent_guardrails.py' -v
+          python3 -m unittest discover -s scripts -p 'test_agent*.py' -v

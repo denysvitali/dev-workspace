@@ -120,8 +120,9 @@ Git hooks are local enforcement; `--no-verify` bypasses them. CI in this
 repository tests the shared tooling; other repositories can run the checker
 in their CI for enforcement outside this workspace.
 
-`scripts/agent_checkpoint.py` supports Codex `SessionStart`, `PreCompact`,
-`PostToolUse`, `Stop`, and `UserPromptSubmit` command hooks. Configure the
+`scripts/agent_checkpoint.py` supports Codex and Claude `SessionStart`, `PreCompact`,
+`PostToolUse`, `Stop`, and `UserPromptSubmit` command hooks, plus Claude's
+`PostToolUseFailure`. Configure the
 reviewed script in `~/.codex/hooks.json`, then trust each exact hook hash
 through Codex's hook review. SessionStart injects only that session's saved
 goal, recent user constraints, progress, and optional `.notes.md` task state.
@@ -131,4 +132,27 @@ are excluded. Add a short durable note before milestones or long waits with
 verified work, remaining steps, relevant files, commit/run identifiers, and
 active process identifiers. Hooks preserve evidence, but cannot guarantee
 that a model remembers every detail; the notes and Happy ToDo list remain
-the explicit task record. Recovery is bounded to 10,000 characters.
+the explicit task record. Recovery is bounded to 10,000 characters, with
+separate budgets for the goal, latest corrections, progress, and note so a
+large note cannot push recent user instructions out of the recovery message.
+
+Confirmed root transcripts under Happy share a checkpoint keyed by
+`HAPPY_SESSION_ID`; changing the native provider/thread no longer loses the
+task. Subagents and unrecognized transcript formats retain isolated checkpoints.
+Only a session-start or user-prompt event can transfer checkpoint ownership;
+late tool/stop hooks from a replaced provider cannot overwrite the replacement.
+Existing private notes remain accessible during migration. The script warns
+once after three consecutive identical explicit tool errors; successful tool
+results, including nonterminal CI waits, reset that streak. It does not block
+turn completion, auto-retry commands, or claim semantic progress from tool counts.
+
+Install the shared [progress rules](agent-guidance/progress.md) into both
+providers' global guides and add Claude hooks without removing existing settings:
+
+```bash
+python3 scripts/install_agent_progress.py
+python3 -m unittest discover -s scripts -p 'test_agent*.py' -v
+```
+
+The installer preserves existing hook entries and model settings. Codex hook
+definitions and their approvals stay under the user's existing configuration.

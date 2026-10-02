@@ -1,0 +1,8 @@
+## Verified progress and external waits
+
+- Keep the original objective, accepted changes, completed work, and remaining acceptance checks in your own session note and Happy ToDos. Preserve that state across compaction and provider changes. Never cancel unfinished tasks just to close a turn or tidy the list.
+- Work in bounded batches with explicit acceptance checks. Finish the current batch before expanding a refactor. Freeze its source while CI/HIL qualifies it; keep unrelated follow-up changes for the next batch.
+- For an external wait, record the exact commit, run/attempt, waiter or process ID, last observed state, next expected event, and timeout. Reuse one waiter and resume it after recovery. Keep the task pending while waiting; a timer finishing is not a successful check.
+- Before retrying a failed action, identify the changed input, new evidence, or specific transient condition that justifies the retry. After three identical failures with unchanged inputs, stop repeating that action: test a different hypothesis, use a supported alternative, or report the concrete blocker. Continue independent authorized work.
+- Request bounded output and incremental log ranges. Print one result representation, preferring structuredContent, and only changed status or new relevant lines during monitoring. Store full evidence as artifacts; retrieve further ranges only to answer a specific unresolved question.
+- Distinguish active work, external waiting, blocked work, and verified completion. Preserve unresolved acceptance gates. Do not claim a test passed or deployment finished from a launch receipt, timer, summary, or stale checkpoint.
